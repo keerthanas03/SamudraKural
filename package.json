@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "expo": "^57.0.24",
+    "sarvamai": "^1.1.8-alpha.5"
+  }
+}

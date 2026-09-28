@@ -1,0 +1,120 @@
+ORCA 12-AGENT BOT INTENT VERIFICATION RESULTS
+=============================================
+
+=== QUESTION 1: 'Can I go fishing tomorrow from Chennai?' ===
+DETECTED INTENT: fishing_advisory (Expected: fishing_advisory)
+RISK LEVEL: MODERATE (MODERATE RISK - PROCEED WITH CAUTION)
+RESPONSE TEXT:
+⚠️ நாளைக்கு கவனமாக மீன்பிடிக்க செல்லவும் (மிதமான கடல் நிலை):
+• காற்றின் வேகம்: 28.9 கி.மீ/மணி (SW) | அலை உயரம்: 1.08 மீட்டர்
+• நீரோட்டம்: 0.0 நாட்ஸ் | கடல் வெப்பநிலை: 30.0°C
+• சிறந்த மீன்பிடி பகுதி: Chennai Offshore Thermal Front (10.7 கி.மீ NE)
+
+வழிகாட்டல்: விசைப்படகுகள் எச்சரிக்கையுடன் செல்லலாம்; நாட்டுப் படகுகள் கரைக்கு அருகில் இருக்கவும்.
+
+📊 ஒருங்கிணைக்கப்பட்ட நேரலை தரவுத்தளங்கள் (நாளைக்கான முன்னறிவிப்பு (24h Forecast)):
+• INCOIS (மத்திய புவி அறிவியல் அமைச்சகம்) - PFZ சாட்டிலைட் & கடல் முன்னறிவிப்பு
+• Copernicus Marine Services (CMEMS) - கடல் இயற்பியல் நீரோட்டம் & அலை Stokes Drift
+• Open-Meteo Marine & Atmos Models (அலை, காற்று & மழை கணிப்பு)
+VOICE TEXT:
+நாளைக்கு கவனமாக மீன்பிடிக்க செல்லவும் (மிதமான கடல் நிலை):
+========================================================
+
+=== QUESTION 2: 'Where is the nearest mackerel potential fishing zone?' ===
+DETECTED INTENT: find_pfz (Expected: find_pfz)
+RISK LEVEL: LOW (SAFE FOR FISHING)
+RESPONSE TEXT:
+🐟 INCOIS Satellite Potential Fishing Zone (PFZ):
+• Recommended Hotspot: Chennai Offshore Thermal Front
+• Location Vector: 10.7 km (5.8 NM) NE (Bearing: 45.0°)
+• Seafloor Depth: 38 meters | Target Fish: Indian Mackerel (கானாங்களுத்தி), Oil Sardine (மத்தி), Yellowfin Tuna (சூரை), Seer Fish (வஞ்சிரம்)
+• Sea Surface Temp: 30.2°C | Fishery Trend: Peak Pelagic Mackerel & Sardine Coastal Fishery Season
+
+Navigation: Tap 'Show Route on Ocean Map' to plot this GPS waypoint on your navigation chart.
+
+📊 Integrated Real-Time Datasets (Live Real-Time Telemetry):
+• INCOIS (Ministry of Earth Sciences, Govt of India) - PFZ & Ocean State Forecast
+• Copernicus Marine Services (CMEMS) - Ocean Surface Physics & Hydrodynamics
+• Open-Meteo High-Resolution Marine & Atmospheric Numerical Models
+VOICE TEXT:
+INCOIS Satellite Potential Fishing Zone (PFZ):
+========================================================
+
+=== QUESTION 3: 'What is the wave height?' ===
+DETECTED INTENT: wave_conditions (Expected: wave_conditions)
+RISK LEVEL: MODERATE (MODERATE RISK - PROCEED WITH CAUTION)
+RESPONSE TEXT:
+🌊 Live Ocean Wave & Hydrodynamic Telemetry:
+• Significant Wave Height: 0.90 meters (Period: 6.8 seconds)
+• Coastal Surface Current: 0.4 knots towards S
+• Sea Surface Temp: 30.2°C
+
+Operational Advisory: Sea state is calm and favorable for all fishing vessels.
+
+📊 Integrated Real-Time Datasets (Live Real-Time Telemetry):
+• INCOIS (Ministry of Earth Sciences, Govt of India) - PFZ & Ocean State Forecast
+• Copernicus Marine Services (CMEMS) - Ocean Surface Physics & Hydrodynamics
+• Open-Meteo High-Resolution Marine & Atmospheric Numerical Models
+VOICE TEXT:
+🌊 Live Ocean Wave & Hydrodynamic Telemetry:
+========================================================
+
+=== QUESTION 4: 'How strong is the wind?' ===
+DETECTED INTENT: wind_conditions (Expected: wind_conditions)
+RISK LEVEL: MODERATE (MODERATE RISK - PROCEED WITH CAUTION)
+RESPONSE TEXT:
+💨 Live Wind Velocity & Direction Telemetry:
+• 10m Sustained Wind Speed: 32.2 km/h (SW)
+• Peak Wind Gusts: 40.0 km/h
+• Ambient Air Temp: 30.9°C | Sea Swell: 0.90m
+
+Operational Advisory: Moderate to fresh breeze active. Exercise caution.
+
+📊 Integrated Real-Time Datasets (Live Real-Time Telemetry):
+• INCOIS (Ministry of Earth Sciences, Govt of India) - PFZ & Ocean State Forecast
+• Copernicus Marine Services (CMEMS) - Ocean Surface Physics & Hydrodynamics
+• Open-Meteo High-Resolution Marine & Atmospheric Numerical Models
+VOICE TEXT:
+💨 Live Wind Velocity & Direction Telemetry:
+========================================================
+
+=== QUESTION 5: 'Where is the nearest port?' ===
+DETECTED INTENT: nearest_port (Expected: nearest_port)
+RISK LEVEL: LOW (SAFE FOR FISHING)
+RESPONSE TEXT:
+⚓ Nearest Base Port & Emergency Maritime Harbor:
+• Base Port: Port of Chennai (Harbour Entrance)
+• Distance Vector: 9.5 km (5.1 NM) W (Course: 270°)
+• Harbor Depth: 19 meters | Coast Guard VHF: VHF Ch 16 / 12 (156.8 MHz)
+
+Emergency Directive: Establish contact on VHF Marine Channel 16 (156.8 MHz) during emergencies.
+
+📊 Integrated Real-Time Datasets (Live Real-Time Telemetry):
+• INCOIS (Ministry of Earth Sciences, Govt of India) - PFZ & Ocean State Forecast
+• Copernicus Marine Services (CMEMS) - Ocean Surface Physics & Hydrodynamics
+• Open-Meteo High-Resolution Marine & Atmospheric Numerical Models
+VOICE TEXT:
+Nearest Base Port & Emergency Maritime Harbor:
+========================================================
+
+=== QUESTION 6: 'What fish can I catch?' ===
+DETECTED INTENT: fish_species (Expected: fish_species)
+RISK LEVEL: LOW (SAFE FOR FISHING)
+RESPONSE TEXT:
+🐟 INCOIS Satellite Potential Fishing Zone (PFZ):
+• Recommended Hotspot: Chennai Offshore Thermal Front
+• Location Vector: 10.7 km (5.8 NM) NE (Bearing: 45.0°)
+• Seafloor Depth: 38 meters | Target Fish: Indian Mackerel (கானாங்களுத்தி), Oil Sardine (மத்தி), Yellowfin Tuna (சூரை), Seer Fish (வஞ்சிரம்)
+• Sea Surface Temp: 30.2°C | Fishery Trend: Peak Pelagic Mackerel & Sardine Season. Strong coastal catch rates.
+
+Navigation: Tap 'Show Route on Ocean Map' to plot this GPS waypoint on your navigation chart.
+
+📊 Integrated Real-Time Datasets (Live Real-Time Telemetry):
+• INCOIS (Ministry of Earth Sciences, Govt of India) - PFZ & Ocean State Forecast
+• Copernicus Marine Services (CMEMS) - Ocean Surface Physics & Hydrodynamics
+• Open-Meteo High-Resolution Marine & Atmospheric Numerical Models
+VOICE TEXT:
+INCOIS Satellite Potential Fishing Zone (PFZ):
+========================================================
+
+SUCCESS: ALL 6 QUESTIONS PRODUCED TAILORED DYNAMIC RESPONSES.

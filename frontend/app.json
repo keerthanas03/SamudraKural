@@ -1,0 +1,69 @@
+{
+  "expo": {
+    "name": "Samudra Kural",
+    "slug": "samudra-kural",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Samudra Kural requires precise GPS coordinates to calculate live vessel location and dispatch emergency SOS alerts.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Continuous GPS updates are required for high-frequency maritime distress telemetry.",
+        "NSBluetoothAlwaysUsageDescription": "Bluetooth is required for offline peer-to-peer SOS transmission and nearby vessel discovery.",
+        "NSBluetoothPeripheralUsageDescription": "Bluetooth is required to broadcast emergency SOS distress signals to nearby vessels.",
+        "NSLocalNetworkUsageDescription": "Local Wi-Fi Direct and peer-to-peer networking are required for offline emergency mesh communication."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_ADVERTISE",
+        "BLUETOOTH_CONNECT",
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_WIFI_STATE",
+        "CHANGE_WIFI_MULTICAST_STATE",
+        "NEARBY_WIFI_DEVICES",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT"
+      ],
+      "package": "com.anonymous.samudrakural"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-audio",
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": [
+            "peripheral",
+            "central"
+          ],
+          "bluetoothAlwaysPermission": "Allow Samudra Kural to use Bluetooth for offline emergency peer-to-peer distress communication."
+        }
+      ]
+    ]
+  }
+}

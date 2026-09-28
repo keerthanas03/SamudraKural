@@ -1,0 +1,22 @@
+﻿services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: samudra_kural_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-samudra_kural}
+      POSTGRES_USER: ${POSTGRES_USER:-samudra}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-samudra_dev_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-samudra} -d ${POSTGRES_DB:-samudra_kural}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
