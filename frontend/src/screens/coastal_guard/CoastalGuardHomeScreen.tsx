@@ -189,7 +189,7 @@ export const CoastalGuardHomeScreen: React.FC<CoastalGuardHomeScreenProps> = ({
         </View>
       )}
       {isMainScreen && (
-        <HeaderWaveBottom color={Colors.cgPrimary} bgColor={Colors.cgBackground} height={42} />
+        <HeaderWaveBottom color={Colors.cgPrimary} bgColor={Colors.cgBackground} height={16} />
       )}
 
       {/* Real-time Emergency Broadcast Notification Banner with Siren Sound Button */}

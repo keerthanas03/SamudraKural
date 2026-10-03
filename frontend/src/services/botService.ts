@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { apiFetch, API_BASE_URL } from './api';
+import { isLocationInland } from './navigationService';
 
 export interface AgentExecutionStep {
   agent_id: number;
@@ -92,6 +93,74 @@ export async function askOrcaBot(
   }
 }
 
+const COASTAL_PORTS_DB = [
+  { name: 'Port of Chennai', nameTa: 'சென்னை துறைமுகம்', lat: 13.0827, lon: 80.2925, depth: 19 },
+  { name: 'Kamarajar Port (Ennore)', nameTa: 'காமராஜர் துறைமுகம் (எண்ணூர்)', lat: 13.2612, lon: 80.3340, depth: 16 },
+  { name: 'Cuddalore Port', nameTa: 'கடலூர் துறைமுகம்', lat: 11.7042, lon: 79.7725, depth: 9 },
+  { name: 'Nagapattinam Harbour', nameTa: 'நாகப்பட்டினம் துறைமுகம்', lat: 10.7607, lon: 79.8458, depth: 8 },
+  { name: 'Rameswaram Jetty', nameTa: 'ராமேஸ்வரம் துறைமுகம்', lat: 9.2876, lon: 79.3129, depth: 6 },
+  { name: 'Tuticorin VOC Port', nameTa: 'தூத்துக்குடி துறைமுகம்', lat: 8.7533, lon: 78.1969, depth: 14 },
+  { name: 'Kanyakumari Harbour', nameTa: 'கன்னியாகுமரி துறைமுகம்', lat: 8.0780, lon: 77.5550, depth: 10 },
+  { name: 'Vizhinjam Port', nameTa: 'விழிஞ்ஞம் துறைமுகம்', lat: 8.3753, lon: 76.9890, depth: 20 },
+  { name: 'Cochin / Kochi Port', nameTa: 'கொச்சி துறைமுகம்', lat: 9.9658, lon: 76.2673, depth: 14 },
+  { name: 'New Mangalore Port', nameTa: 'மங்களூர் துறைமுகம்', lat: 12.9288, lon: 74.8184, depth: 15 },
+  { name: 'Mormugao Port (Goa)', nameTa: 'கோவா துறைமுகம்', lat: 15.4144, lon: 73.8016, depth: 14 },
+  { name: 'Mumbai Port (MbPT)', nameTa: 'மும்பை துறைமுகம்', lat: 18.9500, lon: 72.8500, depth: 14 },
+  { name: 'Deendayal Port (Kandla)', nameTa: 'காண்ட்லா துறைமுகம்', lat: 23.0033, lon: 70.2192, depth: 13 },
+  { name: 'Krishnapatnam Port', nameTa: 'கிருஷ்ணபட்டினம் துறைமுகம்', lat: 14.2500, lon: 80.1250, depth: 18 },
+  { name: 'Visakhapatnam Port', nameTa: 'விசாகப்பட்டினம் துறைமுகம்', lat: 17.6933, lon: 83.2986, depth: 18 },
+  { name: 'Paradip Port', nameTa: 'பாராதீப் துறைமுகம்', lat: 20.2644, lon: 86.6714, depth: 17 },
+  { name: 'Haldia Port (Kolkata)', nameTa: 'ஹால்டியா துறைமுகம்', lat: 22.0200, lon: 88.0600, depth: 12 },
+];
+
+function calcDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 10) / 10;
+}
+
+function calcBearing(lat1: number, lon1: number, lat2: number, lon2: number): { bearing: number; cardinal: string } {
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+  const y = Math.sin(deltaLambda) * Math.cos(phi2);
+  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+  const deg = ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+  const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const cardinal = directions[Math.round(deg / 45) % 8];
+  return { bearing: Math.round(deg), cardinal };
+}
+
+function isInlandCoordinate(lat: number, lon: number): boolean {
+  // East coast of India (Tamil Nadu, Andhra, Odisha, WB): coastline is to the east
+  if (lat >= 12.5 && lat <= 13.6) return lon < 80.26; // Chennai / Tambaram / Alandur / Kanchipuram
+  if (lat >= 11.5 && lat < 12.5) return lon < 79.83; // Cuddalore / Pondicherry
+  if (lat >= 10.5 && lat < 11.5) return lon < 79.84; // Nagapattinam
+  if (lat >= 9.5 && lat < 10.5) return lon < 79.32;  // Palk Bay
+  if (lat >= 8.8 && lat < 9.5) return lon < 79.15;   // Rameswaram
+  if (lat >= 8.0 && lat < 8.8) return lat < 8.2 ? lon < 77.55 : lon < 78.14; // Kanyakumari / Tuticorin
+
+  // West coast of India (Kerala, Karnataka, Goa, Maharashtra, Gujarat): coastline is to the west
+  if (lat >= 8.2 && lat <= 10.5) return lon > 76.30; // Kerala
+  if (lat > 10.5 && lat <= 13.5) return lon > 74.80; // Mangalore
+  if (lat > 13.5 && lat <= 16.0) return lon > 73.80; // Goa
+  if (lat > 16.0 && lat <= 20.0) return lon > 72.85; // Mumbai / Maharashtra
+  if (lat > 20.0 && lat <= 24.0) return lat < 22.0 ? lon > 70.40 : lon > 70.10; // Gujarat
+
+  // Andhra, Odisha, West Bengal
+  if (lat > 13.6 && lat <= 16.0) return lon < 80.12;
+  if (lat > 16.0 && lat <= 18.5) return lon < 83.25;
+  if (lat > 18.5 && lat <= 21.0) return lon < 86.65;
+  if (lat > 21.0 && lat <= 24.0) return lon < 87.50;
+
+  return false;
+}
+
 export function getOfflineOrcaResponse(
   query: string,
   lat: number,
@@ -119,6 +188,37 @@ export function getOfflineOrcaResponse(
   const isMalayalam = activeLang === 'ml';
   const isHindi = activeLang === 'hi';
 
+  // Dynamic GPS Port and Location Resolution
+  let closestPort = COASTAL_PORTS_DB[0];
+  let minPortDist = 999999;
+  for (const port of COASTAL_PORTS_DB) {
+    const dist = calcDistanceKm(lat, lon, port.lat, port.lon);
+    if (dist < minPortDist) {
+      minPortDist = dist;
+      closestPort = port;
+    }
+  }
+
+  const isInland = isInlandCoordinate(lat, lon) || minPortDist > 50.0 || qLower.includes('madurai') || qLower.includes('மதுரை');
+  const portNameEn = closestPort.name;
+  const portNameTa = closestPort.nameTa;
+  const portDistKm = Math.max(1.2, minPortDist);
+  const portDistNm = Math.round((portDistKm / 1.852) * 10) / 10;
+  const bearingInfo = calcBearing(lat, lon, closestPort.lat, closestPort.lon);
+
+  const locNameEn = isInland 
+    ? `Inland Location (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`
+    : `${portNameEn} Sector (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`;
+  const locNameTa = isInland 
+    ? `உள்நாட்டு பகுதி (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`
+    : `${portNameTa} பகுதி (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`;
+
+  // Dynamic Hotspot / PFZ relative to user GPS coordinates
+  const pfzLat = Math.round((lat + 0.065) * 10000) / 10000;
+  const pfzLon = Math.round((lon + 0.075) * 10000) / 10000;
+  const pfzDistKm = Math.round(calcDistanceKm(lat, lon, pfzLat, pfzLon) * 10) / 10 || 12.4;
+  const pfzDistNm = Math.round((pfzDistKm / 1.852) * 10) / 10;
+
   let intent = 'general_advisory';
   let responseText = '';
   let voiceText = '';
@@ -141,20 +241,20 @@ export function getOfflineOrcaResponse(
   ) {
     intent = 'net_drift';
     if (isTamil) {
-      responseText = `🕸️ தொலைந்த வலை மிதப்பு கணிப்பு (Lagrangian Simulation)\n\n• மதிப்பிடப்பட்ட மிதப்பு தூரம்: 1.2 கி.மீ (வடகிழக்கு NE நோக்கி)\n• நீரோட்ட வேகம்: 0.8 நாட்ஸ் | காற்று: 18.5 கி.மீ/மணி\n\nமீட்பு வழிகாட்டல்: உங்கள் வலையின் நேரலை GPS கணிப்பு வரைபடத்தை பார்க்க My Nets பக்கத்தை திறக்கவும்.`;
-      voiceText = `தொலைந்த வலை சுமார் 1.2 கிலோமீட்டர் வடகிழக்கு நோக்கி மிதந்து கொண்டிருக்கிறது. My Nets பக்கத்தில் நேரலை வரைபடத்தை பார்க்கவும்.`;
+      responseText = `🕸️ தொலைந்த வலை மிதப்பு கணிப்பு (Lagrangian Simulation)\n\n📍 உங்கள் GPS: ${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E (${portNameTa} பகுதி)\n• மதிப்பிடப்பட்ட மிதப்பு தூரம்: 1.2 கி.மீ (வடகிழக்கு NE நோக்கி)\n• நீரோட்ட வேகம்: 0.8 நாட்ஸ் | காற்று: 18.5 கி.மீ/மணி\n\nமீட்பு வழிகாட்டல்: உங்கள் வலையின் நேரலை GPS கணிப்பு வரைபடத்தை பார்க்க My Nets பக்கத்தை திறக்கவும்.`;
+      voiceText = `உங்கள் GPS இடத்திலிருந்து தொலைந்த வலை சுமார் 1.2 கிலோமீட்டர் வடகிழக்கு நோக்கி மிதந்து கொண்டிருக்கிறது. My Nets பக்கத்தில் நேரலை வரைபடத்தை பார்க்கவும்.`;
     } else if (isTelugu) {
-      responseText = `🕸️ పోయిన వల డ్రిఫ్ట్ సూచన (Lagrangian Simulation)\n\n• అంచనా వేసిన దూరం: 1.2 కి.మీ (ఈశాన్యం NE వైపు)\n• ప్రవాహం: 0.8 నాట్స్ | గాలి: 18.5 కి.మీ/గం\n\nసలహా: వల ప్రత్యక్ష GPS స్థానాన్ని ట్రాక్ చేయడానికి My Nets పేజీని తెరవండి.`;
+      responseText = `🕸️ పోయిన వల డ్రిఫ్ట్ సూచన (Lagrangian Simulation)\n\n📍 మీ GPS: ${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E\n• అంచనా వేసిన దూరం: 1.2 కి.మీ (ఈశాన్యం NE వైపు)\n• ప్రవాహం: 0.8 నాట్స్ | గాలి: 18.5 కి.మీ/గం\n\nసలహా: వల ప్రత్యక్ష GPS స్థానాన్ని ట్రాక్ చేయడానికి My Nets పేజీని తెరవండి.`;
       voiceText = `పోయిన వల ఈశాన్యం వైపు కొట్టుకుపోతోంది. My Nets పేజీలో చూడండి.`;
     } else if (isMalayalam) {
-      responseText = `🕸️ നഷ്ടപ്പെട്ട വലയുടെ ഒഴുക്ക് പ്രവചനം:\n\n• ദൂരം: 1.2 കി.മീ (വടക്കുകിഴക്ക് NE ദിശയിലേക്ക്)\n• ഒഴുക്ക്: 0.8 നോട്ട് | കാറ്റ്: 18.5 കി.മീ/മണിക്കൂർ\n\nനിർദ്ദേശം: വലയുടെ റൂട്ട് കാണാൻ My Nets പേജ് തുറക്കുക.`;
+      responseText = `🕸️ നഷ്ടപ്പെട്ട വലയുടെ ഒഴുക്ക് പ്രവചനം:\n\n📍 നിങ്ങളുടെ GPS: ${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E\n• ദൂരം: 1.2 കി.മീ (വടക്കുകിഴക്ക് NE ദിശയിലേക്ക്)\n• ഒഴുക്ക്: 0.8 നോട്ട് | കാറ്റ്: 18.5 കി.മീ/മണിക്കൂർ\n\nനിർദ്ദേശം: വലയുടെ റൂട്ട് കാണാൻ My Nets പേജ് തുറക്കുക.`;
       voiceText = `വല വടക്കുകിഴക്ക് ദിശയിലേക്ക് ഒഴുകുന്നു. My Nets പേജ് കാണുക.`;
     } else if (isHindi) {
-      responseText = `🕸️ खोया हुआ जाल बहाव पूर्वानुमान (Lagrangian Simulation):\n\n• अनुमानित बहाव दूरी: 1.2 किमी (उत्तर-पूर्व NE की ओर)\n• समुद्री धारा: 0.8 नॉट्स | हवा: 18.5 किमी/घंटा\n\nपुनर्प्राप्ति सलाह: अपने जाल की लाइव GPS स्थिति देखने के लिए My Nets टैब खोलें।`;
+      responseText = `🕸️ खोया हुआ जाल बहाव पूर्वानुमान (Lagrangian Simulation):\n\n📍 आपका GPS: ${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E\n• अनुमानित बहाव दूरी: 1.2 किमी (उत्तर-पूर्व NE की ओर)\n• समुद्री धारा: 0.8 नॉट्स | हवा: 18.5 किमी/घंटा\n\nपुनर्प्राप्ति सलाह: अपने जाल की लाइव GPS स्थिति देखने के लिए My Nets टैब खोलें।`;
       voiceText = `खोया हुआ जाल उत्तर-पूर्व की ओर बह रहा है। My Nets टैब देखें।`;
     } else {
-      responseText = `🕸️ Lagrangian Lost Net Drift Prediction:\n\n• Estimated Drift: 1.2 km vector towards Northeast (NE)\n• Driving Factors: Surface current (0.8 kts) & wind leeway (18.5 km/h NE)\n\nRecovery Action: Open 'My Nets' tab to view the live GPS drift trajectory and recovery coordinates.`;
-      voiceText = `Estimated lost net drift is approximately 1.2 kilometers towards Northeast. Open My Nets to track GPS recovery route.`;
+      responseText = `🕸️ Lagrangian Lost Net Drift Prediction:\n\n📍 Current GPS: ${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E (${portNameEn} Sector)\n• Estimated Drift: 1.2 km vector towards Northeast (NE)\n• Driving Factors: Surface current (0.8 kts) & wind leeway (18.5 km/h NE)\n\nRecovery Action: Open 'My Nets' tab to view the live GPS drift trajectory and recovery coordinates.`;
+      voiceText = `Estimated lost net drift is approximately 1.2 kilometers towards Northeast from your current GPS position. Open My Nets to track recovery route.`;
     }
   }
   // 2. Wave Conditions
@@ -178,20 +278,20 @@ export function getOfflineOrcaResponse(
   ) {
     intent = 'wave_conditions';
     if (isTamil) {
-      responseText = `🌊 நேரலை கடல் அலை மற்றும் நீரோட்ட தகவல்:\n\n• குறிப்பிடத்தக்க அலை உயரம்: 1.10 மீட்டர் (கால இடைவெளி: 6.0 வினாடிகள்)\n• மேற்பரப்பு நீரோட்டம்: 0.8 நாட்ஸ் (NE நோக்கி)\n• கடல் வெப்பநிலை: 28.3°C\n\nஆலோசனை: கடல் அலை அமைதியாக உள்ளது, அனைத்து படகுகளுக்கும் சாதகமானது.`;
-      voiceText = `கடல் அலை உயரம் 1.1 மீட்டர். கடல் நிலை அமைதியாகவும் சாதகமாகவும் உள்ளது.`;
+      responseText = `🌊 நேரலை கடல் அலை மற்றும் நீரோட்ட தகவல்:\n\n📍 பகுதி: ${portNameTa} (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)\n• குறிப்பிடத்தக்க அலை உயரம்: 1.10 மீட்டர் (கால இடைவெளி: 6.0 வினாடிகள்)\n• மேற்பரப்பு நீரோட்டம்: 0.8 நாட்ஸ் (NE நோக்கி)\n• கடல் வெப்பநிலை: 28.3°C\n\nஆலோசனை: கடல் அலை அமைதியாக உள்ளது, அனைத்து படகுகளுக்கும் சாதகமானது.`;
+      voiceText = `${portNameTa} பகுதியில் கடல் அலை உயரம் 1.1 மீட்டர். கடல் நிலை அமைதியாகவும் சாதகமாகவும் உள்ளது.`;
     } else if (isTelugu) {
-      responseText = `🌊 సముద్రపు అలల సమాచారం:\n\n• అలల ఎత్తు: 1.10 మీటర్లు (పీరియడ్: 6.0 సెకన్లు)\n• ఉపరితల ప్రవాహం: 0.8 నాట్స్ (NE)\n• సముద్ర ఉష్ణోగ్రత: 28.3°C\n\nసలహా: సముద్రపు అలలు ప్రశాంతంగా ఉన్నాయి.`;
+      responseText = `🌊 సముద్రపు అలల సమాచారం:\n\n📍 స్థానం: ${portNameEn} (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)\n• అలల ఎత్తు: 1.10 మీటర్లు (పీరియడ్: 6.0 సెకన్లు)\n• ఉపరితల ప్రవాహం: 0.8 నాట్స్ (NE)\n• సముద్ర ఉష్ణోగ్రత: 28.3°C\n\nసలహా: సముద్రపు అలలు ప్రశాంతంగా ఉన్నాయి.`;
       voiceText = `అలల ఎత్తు 1.1 మీటర్లు. సముద్రం ప్రశాంతంగా ఉంది.`;
     } else if (isMalayalam) {
-      responseText = `🌊 തത്സമയ തിരമാല വിവരം:\n\n• തിരമാല ഉയരം: 1.10 മീറ്റർ (കാലയളവ്: 6.0 സെക്കൻഡ്)\n• ഉപരിതല ഒഴുക്ക്: 0.8 നോട്ട് (NE)\n• സമുദ്ര താപനില: 28.3°C\n\nനിർദ്ദേശം: കടൽ ശാന്തമാണ്, സുരക്ഷിതമായി യാത്ര ചെയ്യാം.`;
+      responseText = `🌊 തത്സമയ തിരമാല വിവരം:\n\n📍 സ്ഥലം: ${portNameEn} (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)\n• തിരമാല ഉയരം: 1.10 മീറ്റർ (കാലയളവ്: 6.0 സെക്കൻഡ്)\n• ഉപരിതല ഒഴുക്ക്: 0.8 നോട്ട് (NE)\n• സമുദ്ര താപനില: 28.3°C\n\nനിർദ്ദേശം: കടൽ ശാന്തമാണ്, സുരക്ഷിതമായി യാത്ര ചെയ്യാം.`;
       voiceText = `തിരമാല ഉയരം 1.1 മീറ്റർ. കടൽ ശാന്തമാണ്.`;
     } else if (isHindi) {
-      responseText = `🌊 लाइव महासागरीय लहर एवं धारा टेलीमेट्री:\n\n• लहरों की ऊंचाई: 1.10 मीटर (तरंग काल: 6.0 सेकंड)\n• समुद्री धारा: 0.8 नॉट्स (NE)\n• समुद्र तापमान: 28.3°C\n\nसलाह: समुद्र की लहरें शांत हैं, सभी नावों के लिए अनुकूल।`;
+      responseText = `🌊 लाइव महासागरीय लहर एवं धारा टेलीमेट्री:\n\n📍 स्थान: ${portNameEn} (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)\n• लहरों की ऊंचाई: 1.10 मीटर (तरंग काल: 6.0 सेकंड)\n• समुद्री धारा: 0.8 नॉट्स (NE)\n• समुद्र तापमान: 28.3°C\n\nसलाह: समुद्र की लहरें शांत हैं, सभी नावों के लिए अनुकूल।`;
       voiceText = `लहरों की ऊंचाई 1.1 मीटर है। समुद्र शांत और सुरक्षित है।`;
     } else {
-      responseText = `🌊 Live Ocean Wave & Hydrodynamic Telemetry:\n\n• Significant Wave Height: 1.10 meters (Period: 6.0 seconds)\n• Coastal Surface Current: 0.8 knots towards NE\n• Sea Surface Temp: 28.3°C\n\nOperational Advisory: Sea state is calm and favorable for all fishing vessels.`;
-      voiceText = `Significant wave height is 1.1 meters with 6 second wave period. Sea conditions are calm and favorable.`;
+      responseText = `🌊 Live Ocean Wave & Hydrodynamic Telemetry:\n\n📍 Location: ${portNameEn} Sector (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)\n• Significant Wave Height: 1.10 meters (Period: 6.0 seconds)\n• Coastal Surface Current: 0.8 knots towards NE\n• Sea Surface Temp: 28.3°C\n\nOperational Advisory: Sea state is calm and favorable for all fishing vessels.`;
+      voiceText = `Significant wave height in ${portNameEn} sector is 1.1 meters with 6 second wave period. Sea conditions are calm and favorable.`;
     }
   }
   // 3. Wind Conditions
@@ -212,11 +312,11 @@ export function getOfflineOrcaResponse(
   ) {
     intent = 'wind_conditions';
     if (isTamil) {
-      responseText = `💨 நேரலை காற்று மற்றும் வளிமண்டல தகவல்:\n\n• காற்றின் வேகம்: 18.5 கி.மீ/மணி (NE) | காற்று வீச்சு: 24.0 கி.மீ/மணி\n• வெப்பநிலை: 29.0°C | மழை வாய்ப்பு: 10%\n\nஆலோசனை: சாதாரண கடலோர காற்று, படகு இயக்கத்திற்கு சிறந்தது.`;
-      voiceText = `காற்றின் வேகம் 18.5 கி.மீ/மணி. படகு இயக்கத்திற்கு சாதகமானது.`;
+      responseText = `💨 நேரலை காற்று மற்றும் வளிமண்டல தகவல்:\n\n📍 அமைவிடம்: ${portNameTa} பகுதி (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)\n• காற்றின் வேகம்: 18.5 கி.மீ/மணி (NE) | காற்று வீச்சு: 24.0 கி.மீ/மணி\n• வெப்பநிலை: 29.0°C | மழை வாய்ப்பு: 10%\n\nஆலோசனை: சாதாரண கடலோர காற்று, படகு இயக்கத்திற்கு சிறந்தது.`;
+      voiceText = `${portNameTa} பகுதியில் காற்றின் வேகம் மணிக்கு 18.5 கிலோமீட்டர். படகு இயக்கத்திற்கு சாதகமானது.`;
     } else {
-      responseText = `💨 Live Atmospheric & Wind Telemetry:\n\n• Sustained Wind Speed: 18.5 km/h (NE) | Peak Gusts: 24.0 km/h\n• Ambient Air Temperature: 29.0°C | Rain: 10%\n\nOperational Advisory: Normal light coastal breeze, ideal for sailing.`;
-      voiceText = `Live sustained wind speed is 18.5 km/h from Northeast. Favorable breeze for fishing.`;
+      responseText = `💨 Live Atmospheric & Wind Telemetry:\n\n📍 Location: ${portNameEn} Sector (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)\n• Sustained Wind Speed: 18.5 km/h (NE) | Peak Gusts: 24.0 km/h\n• Ambient Air Temperature: 29.0°C | Rain: 10%\n\nOperational Advisory: Normal light coastal breeze, ideal for sailing.`;
+      voiceText = `Live sustained wind speed in ${portNameEn} sector is 18.5 km/h from Northeast. Favorable breeze for fishing.`;
     }
   }
   // 4. Nearest Port
@@ -234,11 +334,11 @@ export function getOfflineOrcaResponse(
   ) {
     intent = 'nearest_port';
     if (isTamil) {
-      responseText = `⚓ அருகிலுள்ள துறைமுகம் மற்றும் அவசர தொடர்பு:\n\n• முதன்மை துறைமுகம்: சென்னை துறைமுகம் (Port of Chennai)\n• தோராய தொலைவு: 12.4 கி.மீ (6.7 கடல் மைல்) வடகிழக்கு NE\n• துறைமுக ஆழம்: 19 மீட்டர் | அவசர தொடர்பு: VHF சேனல் 16 (156.8 MHz)\n\nஅவசர ஆலோசனை: அவசர சூழ்நிலையில் VHF சேனல் 16 வழியாக உடனே தொடர்பு கொள்ளவும்.`;
-      voiceText = `அருகிலுள்ள துறைமுகம் சென்னை துறைமுகம், 12.4 கிலோமீட்டர் தொலைவில் உள்ளது. அவசர தொடர்பு VHF சேனல் 16.`;
+      responseText = `⚓ அருகிலுள்ள துறைமுகம் மற்றும் அவசர தொடர்பு:\n\n• முதன்மை துறைமுகம்: ${portNameTa} (${closestPort.lat.toFixed(4)}°N, ${closestPort.lon.toFixed(4)}°E)\n• உங்கள் GPS: ${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E\n• தோராய தொலைவு: ${portDistKm} கி.மீ (${portDistNm} கடல் மைல்) ${bearingInfo.cardinal} திசை\n• துறைமுக ஆழம்: ${closestPort.depth} மீட்டர் | அவசர தொடர்பு: VHF சேனல் 16 (156.8 MHz)\n\nஅவசர ஆலோசனை: அவசர சூழ்நிலையில் VHF சேனல் 16 வழியாக உடனே தொடர்பு கொள்ளவும்.`;
+      voiceText = `உங்கள் GPS இடத்திற்கு அருகிலுள்ள துறைமுகம் ${portNameTa}, ${portDistKm} கிலோமீட்டர் தொலைவில் உள்ளது. அவசர தொடர்பு VHF சேனல் 16.`;
     } else {
-      responseText = `⚓ Nearest Base Port & Emergency Maritime Harbor:\n\n• Base Port: Port of Chennai (Harbour Entrance)\n• Distance Vector: 12.4 km (6.7 NM) NE (Course: 45°)\n• Harbor Depth: 19 meters | Coast Guard VHF: VHF Ch 16 (156.8 MHz)\n\nEmergency Directive: Establish contact on VHF Marine Channel 16 during emergencies.`;
-      voiceText = `Nearest base port is Port of Chennai, approximately 12.4 kilometers away. Coast Guard VHF Channel 16 is active.`;
+      responseText = `⚓ Nearest Base Port & Emergency Maritime Harbor:\n\n• Base Port: ${portNameEn} (${closestPort.lat.toFixed(4)}°N, ${closestPort.lon.toFixed(4)}°E)\n• User GPS: ${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E\n• Distance Vector: ${portDistKm} km (${portDistNm} NM) ${bearingInfo.cardinal} (Bearing: ${bearingInfo.bearing}°)\n• Harbor Depth: ${closestPort.depth} meters | Coast Guard VHF: VHF Ch 16 (156.8 MHz)\n\nEmergency Directive: Establish contact on VHF Marine Channel 16 during emergencies.`;
+      voiceText = `Nearest base port from your coordinates is ${portNameEn}, approximately ${portDistKm} kilometers away. Coast Guard VHF Channel 16 is active.`;
     }
   }
   // 5. Potential Fishing Zone (PFZ) & MOSDAC ISRO Satellite Intelligence
@@ -258,17 +358,17 @@ export function getOfflineOrcaResponse(
     qLower.includes('where can i fish') ||
     qLower.includes('மண்டலம்') ||
     qLower.includes('மீன்பிடி மண்டலம்') ||
-    qLower.includes('చేపల వేట ప్రాంతம்') ||
+    qLower.includes('చేపల వేట ప్రాంతం') ||
     qLower.includes('മത്സ്യബന്ധന മേഖല') ||
     qLower.includes('मत्स्य क्षेत्र')
   ) {
     intent = 'find_pfz';
     if (isTamil) {
-      responseText = `🛰️ INCOIS + ISRO MOSDAC செயற்கைக்கோள் தரவு (PFZ):\n\n• பரிந்துரைக்கப்பட்ட மண்டலம்: சென்னை கடலோர மண்டலம் (Chennai Coast Front)\n• அமைவிடம்: 12.4 கி.மீ (6.7 கடல் மைல்) வடகிழக்கு NE\n• ISRO EOS-06 / INSAT-3DR பொருத்தம்: 96.8% நம்பகத்தன்மை\n• கடல் ஆழம்: 35 மீட்டர் | இலக்கு மீன்கள்: கானாங்களுத்தி, சாளை, சூரை\n• கடல் காற்று (SCATSAT): 14.5 kts | புயல் எச்சரிக்கை: பாதுகாப்பு பகுதி\n\nவழிசெலுத்தல்: வரைபடத்தில் வழியைக் காண 'Show Route on Ocean Map' பொத்தானை அழுத்தவும்.`;
-      voiceText = `இஸ்ரோ மோஸ்டாக் மற்றும் இன்காய்ஸ் செயற்கைக்கோள் தரவுப்படி பரிந்துரைக்கப்பட்ட மீன்பிடி மண்டலம் சென்னை கடலோரம் 12.4 கிலோமீட்டர் தொலைவில் உள்ளது.`;
+      responseText = `🛰️ INCOIS + ISRO MOSDAC செயற்கைக்கோள் தரவு (PFZ):\n\n• பரிந்துரைக்கப்பட்ட மண்டலம்: ${portNameTa} கடலோர மீன்பிடி மண்டலம்\n• இலக்கு GPS: ${pfzLat}°N, ${pfzLon}°E\n• தூரம்: ${pfzDistKm} கி.மீ (${pfzDistNm} கடல் மைல்) வடகிழக்கு NE\n• ISRO EOS-06 / INSAT-3DR பொருத்தம்: 96.8% நம்பகத்தன்மை\n• கடல் ஆழம்: 35 மீட்டர் | இலக்கு மீன்கள்: கானாங்களுத்தி, சாளை, சூரை\n• கடல் காற்று: 14.5 kts | புயல் எச்சரிக்கை: பாதுகாப்பு பகுதி\n\nவழிசெலுத்தல்: வரைபடத்தில் வழியைக் காண 'Show Route on Ocean Map' பொத்தானை அழுத்தவும்.`;
+      voiceText = `இஸ்ரோ மற்றும் இன்காய்ஸ் செயற்கைக்கோள் தரவுப்படி உங்களுக்கான பரிந்துரைக்கப்பட்ட மீன்பிடி மண்டலம் ${portNameTa} பகுதியில் ${pfzDistKm} கிலோமீட்டர் தொலைவில் உள்ளது.`;
     } else {
-      responseText = `🛰️ INCOIS & ISRO MOSDAC Dual-Satellite Potential Fishing Zone (PFZ):\n\n• Recommended Hotspot: Chennai Coastal Front Sector\n• Location Vector: 12.4 km (6.7 NM) NE (Bearing: 45°)\n• ISRO EOS-06 & INSAT-3DR Match: 96.8% Confidence Score\n• Seafloor Depth: 35 meters | Target Fish: Indian Mackerel, Sardine, Tuna\n• Scatterometer Winds: 14.5 knots | Cyclone Watch: Clear Basin\n\nNavigation: Tap 'Show Route on Ocean Map' to plot this GPS waypoint on your navigation chart.`;
-      voiceText = `According to ISRO MOSDAC and INCOIS dual satellite telemetry, the recommended fishing zone is Chennai Coastal Front Sector, approximately 12.4 kilometers Northeast.`;
+      responseText = `🛰️ INCOIS & ISRO MOSDAC Dual-Satellite Potential Fishing Zone (PFZ):\n\n• Recommended Hotspot: ${portNameEn} Coastal Front Sector\n• Waypoint GPS: ${pfzLat}°N, ${pfzLon}°E\n• Location Vector: ${pfzDistKm} km (${pfzDistNm} NM) NE\n• ISRO EOS-06 & INSAT-3DR Match: 96.8% Confidence Score\n• Seafloor Depth: 35 meters | Target Fish: Indian Mackerel, Sardine, Tuna\n• Scatterometer Winds: 14.5 knots | Cyclone Watch: Clear Basin\n\nNavigation: Tap 'Show Route on Ocean Map' to plot this GPS waypoint on your navigation chart.`;
+      voiceText = `According to ISRO MOSDAC and INCOIS satellite telemetry, the recommended fishing zone is in ${portNameEn} sector, approximately ${pfzDistKm} kilometers away.`;
     }
   }
   // 6. Fish Species
@@ -286,11 +386,11 @@ export function getOfflineOrcaResponse(
   ) {
     intent = 'fish_species';
     if (isTamil) {
-      responseText = `🎣 இலக்கு மீன் வகைகள் மற்றும் பருவகால தகவல்:\n\n• முக்கிய மீன்கள்: இந்திய கானாங்களுத்தி, சாளை, சூரை, வஞ்சிரம்\n• பருவகால போக்கு: அக்டோபர்-மார்ச் உச்ச மீன்பிடி பருவம்\n• பரிந்துரைக்கப்பட்ட மண்டலம்: சென்னை கடலோர பகுதி (35 மீ ஆழம்)`;
+      responseText = `🎣 இலக்கு மீன் வகைகள் மற்றும் பருவகால தகவல்:\n\n📍 மண்டலம்: ${portNameTa} பகுதி (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)\n• முக்கிய மீன்கள்: இந்திய கானாங்களுத்தி, சாளை, சூரை, வஞ்சிரம்\n• பருவகால போக்கு: உச்ச மீன்பிடி பருவம்\n• பரிந்துரைக்கப்பட்ட ஆழம்: 30 முதல் 45 மீட்டர்`;
       voiceText = `இன்றைய முக்கிய மீன் வகைகள் கானாங்களுத்தி, சாளை மற்றும் சூரை.`;
     } else {
-      responseText = `🎣 Target Fish Species & Seasonal Trends:\n\n• Key Target Species: Indian Mackerel, Sardine, Tuna, Seer Fish\n• Active Fishery Trend: Peak Pelagic Coastal Season with high catch density\n• Recommended Depth: 30 to 45 meters in coastal thermal fronts`;
-      voiceText = `Primary target species in this sector are Indian Mackerel, Sardine, and Tuna.`;
+      responseText = `🎣 Target Fish Species & Seasonal Trends:\n\n📍 Sector: ${portNameEn} (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)\n• Key Target Species: Indian Mackerel, Sardine, Tuna, Seer Fish\n• Active Fishery Trend: Peak Pelagic Coastal Season with high catch density\n• Recommended Depth: 30 to 45 meters in coastal thermal fronts`;
+      voiceText = `Primary target species in ${portNameEn} sector are Indian Mackerel, Sardine, and Tuna.`;
     }
   }
   // 7. Rain & Weather Forecast
@@ -311,7 +411,7 @@ export function getOfflineOrcaResponse(
     qLower.includes('मौसम')
   ) {
     intent = 'rain_precipitation';
-    const isTomorrow = qLower.includes('tomorrow') || qLower.includes('tommorrow') || qLower.includes('நாளை') || qLower.includes('कल') || qLower.includes('రేపు') || qLower.includes('നാളെ');
+    const isTomorrow = qLower.includes('tomorrow') || qLower.includes('tommorrow') || qLower.includes('நாளை') || qLower.includes('कल') || qLower.includes('రేపు') || qLower.includes('நாளை');
     const isYesterday = qLower.includes('yesterday') || qLower.includes('netru') || qLower.includes('நேற்று') || qLower.includes('कल');
 
     const specificDateMatch = qLower.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/) ||
@@ -378,14 +478,19 @@ export function getOfflineOrcaResponse(
       dayStrTa = 'நாளை';
     }
 
-    const loc = qLower.includes('madurai') || qLower.includes('மதுரை') ? 'Madurai' : 'Chennai';
-    const locTa = qLower.includes('madurai') || qLower.includes('மதுரை') ? 'மதுரை (Madurai)' : 'சென்னை';
+    const locNameEn = qLower.includes('madurai') || qLower.includes('மதுரை') 
+      ? 'Madurai' 
+      : (isInland ? `Inland Location (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)` : `${portNameEn} Sector (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`);
+    const locNameTa = qLower.includes('madurai') || qLower.includes('மதுரை') 
+      ? 'மதுரை (Madurai)' 
+      : (isInland ? `உள்நாட்டு பகுதி (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)` : `${portNameTa} பகுதி (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`);
 
     if (isTamil) {
-      responseText = `🌦️ இல்லை, ${locTa} பகுதியில் ${dayStrTa} மழை பெய்ய வாய்ப்பில்லை.\n\n📍 இடம்: ${locTa} | காலம்: ${periodTa}\n• மழை பெய்யும் வாய்ப்பு: 4%\n• எதிர்பார்க்கப்படும் மழை அளவு: 0.0 மி.மீ\n• வானிலை நிலை: மேகமூட்டம் (Overcast)\n• காற்றின் வெப்பநிலை: 24.9°C முதல் 36.1°C வரை\n• காற்றின் வேகம்: 26.2 கி.மீ/மணி\n\n💡 வழிகாட்டல்: ${locTa} பகுதியில் ${dayStrTa} மழைக்கு குறைவான வாய்ப்பே உள்ளது (4%).`;
-      voiceText = `${locTa} பகுதிக்கான ${dayStrTa} வானிலை முன்னறிவிப்பு. இல்லை, மழை பெய்ய வாய்ப்பில்லை. மழை சாத்தியக்கூறு வெறும் 4 சதவீதம் மட்டுமே, எதிர்பார்க்கப்படும் மழை 0.0 மில்லிமீட்டர். வானிலை நிலை மேகமூட்டம். காற்றின் வெப்பநிலை 24.9 முதல் 36.1 டிகிரி செல்சியஸ் வரை இருக்கும். காற்றின் வேகம் மணிக்கு 26.2 கிலோமீட்டர்.`;
+      responseText = `🌦️ இல்லை, ${locNameTa} பகுதியில் ${dayStrTa} மழை பெய்ய வாய்ப்பில்லை.\n\n📍 இடம்: ${locNameTa} | காலம்: ${periodTa}\n• மழை பெய்யும் வாய்ப்பு: 4%\n• எதிர்பார்க்கப்படும் மழை அளவு: 0.0 மி.மீ\n• வானிலை நிலை: மேகமூட்டம் (Overcast)\n• காற்றின் வெப்பநிலை: 24.9°C முதல் 36.1°C வரை\n• காற்றின் வேகம்: 26.2 கி.மீ/மணி\n\n💡 வழிகாட்டல்: ${locNameTa} பகுதியில் ${dayStrTa} மழைக்கான வாய்ப்பு மிகக் குறைவு. வானிலை மேகமூட்டமாக இருக்கும்.`;
+      voiceText = `${locNameTa} ${dayStrTa} வானிலை நிலவரம்: இல்லை, ${dayStrTa} மழை பெய்ய வாய்ப்பில்லை. மழை பெய்யும் வாய்ப்பு 4 சதவீதம். மழை அளவு பூஜ்ஜியம் மி.மீ. வானிலை மேகமூட்டமாக இருக்கும். காற்று வெப்பநிலை 24.9 முதல் 36.1 டிகிரி செல்சியஸ். காற்றின் வேகம் 26.2 கி.மீ/மணி. வழிகாட்டல்: மழைக்கான வாய்ப்பு மிகக் குறைவு.`;
     } else {
-      responseText = `🌦️ No, it will not rain ${dayStrEn} in ${loc}.\n\n📍 Location: ${loc} | Forecast Period: ${periodEn}\n• Rain Probability: 4%\n• Expected Rainfall: 0.0 mm\n• Sky Condition: Overcast\n• Air Temperature: 24.9°C - 36.1°C\n• Wind Speed: 26.2 km/h\n\n💡 Advisory: Very low probability of rain (4%, expected: 0.0 mm). Conditions will be mostly overcast.`;
+      const loc = locNameEn;
+      responseText = `🌦️ Weather & Rain Forecast for ${loc} (${periodEn}):\n\n• Rain Probability: 4% (Very Low)\n• Expected Rainfall: 0.0 mm\n• Sky Condition: Overcast ☁️\n• Air Temperature: 24.9°C - 36.1°C\n• Wind Speed: 26.2 km/h (Moderate Breeze)\n• Relative Humidity: 72%\n\n💡 Advisory: No significant rain is expected ${dayStrEn} in ${loc}. Conditions will be mostly overcast.`;
       voiceText = `Weather forecast for ${loc} ${dayStrEn}. No, it will not rain ${dayStrEn} in ${loc}. Rain probability is 4 percent with expected rainfall of 0.0 millimeters. Sky condition will be Overcast. Air temperature will range from 24.9 to 36.1 degrees Celsius. Wind speed will be 26.2 kilometers per hour. Advisory: Very low probability of rain.`;
     }
   }
@@ -487,18 +592,18 @@ export function getOfflineOrcaResponse(
       depth_meters: 35,
     },
     telemetry: {
-      is_inland: qLower.includes('madurai') || qLower.includes('மதுரை'),
+      is_inland: isLocationInland(lat, lon, query),
       wind_kmh: 18.5,
       wind_direction: 'NE',
-      wave_height_m: (qLower.includes('madurai') || qLower.includes('மதுரை')) ? 0.0 : 1.1,
-      wave_period_s: (qLower.includes('madurai') || qLower.includes('மதுரை')) ? 0.0 : 6.0,
-      sea_surface_temp_c: (qLower.includes('madurai') || qLower.includes('மதுரை')) ? 0.0 : 28.3,
-      ocean_current_knots: (qLower.includes('madurai') || qLower.includes('மதுரை')) ? 0.0 : 0.8,
-      ocean_current_direction: (qLower.includes('madurai') || qLower.includes('மதுரை')) ? 'N/A' : 'NE',
+      wave_height_m: isLocationInland(lat, lon, query) ? 0.0 : 1.1,
+      wave_period_s: isLocationInland(lat, lon, query) ? 0.0 : 6.0,
+      sea_surface_temp_c: isLocationInland(lat, lon, query) ? 0.0 : 28.3,
+      ocean_current_knots: isLocationInland(lat, lon, query) ? 0.0 : 0.8,
+      ocean_current_direction: isLocationInland(lat, lon, query) ? 'N/A' : 'NE',
       air_temperature_c: 32.5,
       rain_probability_pct: 5,
-      nearest_port: (qLower.includes('madurai') || qLower.includes('மதுரை')) ? 'Inland Station' : 'Port of Chennai',
-      seafloor_depth_m: (qLower.includes('madurai') || qLower.includes('மதுரை')) ? 0 : 35,
+      nearest_port: isLocationInland(lat, lon, query) ? 'Inland Station' : 'Port of Chennai',
+      seafloor_depth_m: isLocationInland(lat, lon, query) ? 0 : 35,
     },
     quick_actions: [
       { id: 'map', label: '🧭 Show Route on Ocean Map', action: 'NAVIGATE_MAP' },

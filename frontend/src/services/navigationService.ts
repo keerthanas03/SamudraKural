@@ -1044,3 +1044,189 @@ export function getNavigationDetails(
   };
 }
 
+/**
+ * Known Major Inland Cities / Districts that are far from seashore.
+ */
+export const INLAND_CITIES_KEYWORDS: string[] = [
+  'madurai', 'மதுரை', 'मदुरै', 'मदुरई', 'మధురై', 'മധുര',
+  'coimbatore', 'கோயம்புத்தூர்', 'कोयंबटूर',
+  'trichy', 'tiruchirappalli', 'திருச்சி', 'तिरुचिरापल्ली',
+  'salem', 'சேலம்', 'सेलम',
+  'erode', 'ஈரோடு',
+  'tiruppur', 'திருப்பூர்',
+  'vellore', 'வேலூர்',
+  'dindigul', 'திண்டுக்கல்',
+  'thanjavur', 'தஞ்சாவூர்',
+  'karur', 'கரூர்',
+  'namakkal', 'நாமக்கல்',
+  'dharmapuri', 'தருமபுரி',
+  'krishnagiri', 'கிருஷ்ணகிரி',
+  'tiruvannamalai', 'திருவண்ணாமலை',
+  'villupuram', 'விழுப்புரம்',
+  'perambalur', 'பெரம்பலூர்',
+  'ariyalur', 'அரியலூர்',
+  'sivagangai', 'sivaganga', 'சிவகங்கை',
+  'virudhunagar', 'விருதுநகர்',
+  'theni', 'தேனி',
+  'tenkasi', 'தென்காசி',
+  'tirunelveli city',
+  'palakkad', 'பாலக்காடு',
+  'bengaluru', 'bangalore', 'பெங்களூரு',
+  'mysore', 'mysuru',
+  'hyderabad', 'ஹைதராபாத்',
+  'delhi', 'new delhi', 'டெல்லி',
+  'inland',
+];
+
+/**
+ * Key Coastline Reference Points along Indian and Regional Shores (Lat, Lon)
+ */
+export const COASTLINE_POINTS = [
+  // Tamil Nadu & Puducherry East Coast
+  { name: 'Pulicat', lat: 13.42, lon: 80.33 },
+  { name: 'Ennore', lat: 13.23, lon: 80.33 },
+  { name: 'Chennai Marina / Harbour', lat: 13.0827, lon: 80.29 },
+  { name: 'Kovalam / Mahabalipuram', lat: 12.62, lon: 80.20 },
+  { name: 'Puducherry', lat: 11.93, lon: 79.84 },
+  { name: 'Cuddalore', lat: 11.75, lon: 79.78 },
+  { name: 'Poompuhar', lat: 11.15, lon: 79.86 },
+  { name: 'Karaikal', lat: 10.93, lon: 79.85 },
+  { name: 'Nagapattinam', lat: 10.77, lon: 79.85 },
+  { name: 'Velankanni', lat: 10.68, lon: 79.85 },
+  { name: 'Point Calimere / Vedaranyam', lat: 10.30, lon: 79.86 },
+  { name: 'Mallipattinam / Pattukkottai Shore', lat: 10.28, lon: 79.32 },
+  { name: 'Manamelkudi', lat: 10.05, lon: 79.25 },
+  { name: 'Kottaipattinam', lat: 9.98, lon: 79.20 },
+  { name: 'Tondi', lat: 9.74, lon: 79.02 },
+  { name: 'Devipattinam', lat: 9.48, lon: 78.91 },
+  { name: 'Mandapam / Pamban', lat: 9.28, lon: 79.15 },
+  { name: 'Rameswaram', lat: 9.2876, lon: 79.3129 },
+  { name: 'Dhanushkodi', lat: 9.18, lon: 79.42 },
+  { name: 'Kilakarai', lat: 9.23, lon: 78.79 },
+  { name: 'Valinokkam', lat: 9.16, lon: 78.65 },
+  { name: 'Vembar', lat: 9.07, lon: 78.36 },
+  { name: 'Thoothukudi / Tuticorin', lat: 8.7642, lon: 78.16 },
+  { name: 'Tiruchendur', lat: 8.50, lon: 78.13 },
+  { name: 'Kulasekharapatnam', lat: 8.38, lon: 78.07 },
+  { name: 'Uvari', lat: 8.28, lon: 77.89 },
+  { name: 'Idinthakarai / Kudankulam', lat: 8.18, lon: 77.75 },
+  { name: 'Kanyakumari', lat: 8.0883, lon: 77.55 },
+
+  // Kerala & SW Coast
+  { name: 'Colachel', lat: 8.18, lon: 77.26 },
+  { name: 'Vizhinjam / Kovalam', lat: 8.38, lon: 76.99 },
+  { name: 'Thiruvananthapuram Shore', lat: 8.52, lon: 76.93 },
+  { name: 'Kollam', lat: 8.89, lon: 76.54 },
+  { name: 'Alappuzha', lat: 9.50, lon: 76.32 },
+  { name: 'Kochi', lat: 9.96, lon: 76.24 },
+  { name: 'Munambam', lat: 10.18, lon: 76.17 },
+  { name: 'Ponnani', lat: 10.77, lon: 75.92 },
+  { name: 'Kozhikode', lat: 11.25, lon: 75.77 },
+  { name: 'Kannur', lat: 11.87, lon: 75.36 },
+  { name: 'Kasaragod', lat: 12.50, lon: 74.98 },
+
+  // Karnataka, Goa, Maharashtra, Gujarat
+  { name: 'Mangalore', lat: 12.92, lon: 74.82 },
+  { name: 'Malpe / Udupi', lat: 13.35, lon: 74.70 },
+  { name: 'Karwar', lat: 14.81, lon: 74.12 },
+  { name: 'Goa / Mormugao', lat: 15.41, lon: 73.80 },
+  { name: 'Ratnagiri', lat: 16.98, lon: 73.28 },
+  { name: 'Mumbai Coast', lat: 18.95, lon: 72.84 },
+  { name: 'Daman / Surat', lat: 20.42, lon: 72.83 },
+  { name: 'Veraval', lat: 20.90, lon: 70.37 },
+  { name: 'Porbandar', lat: 21.64, lon: 69.60 },
+  { name: 'Dwarka / Okha', lat: 22.46, lon: 69.07 },
+  { name: 'Kandla', lat: 22.98, lon: 70.22 },
+
+  // Andhra Pradesh, Odisha, West Bengal
+  { name: 'Krishnapatnam', lat: 14.25, lon: 80.12 },
+  { name: 'Nizampatnam', lat: 15.90, lon: 80.67 },
+  { name: 'Machilipatnam', lat: 16.18, lon: 81.18 },
+  { name: 'Kakinada', lat: 16.98, lon: 82.28 },
+  { name: 'Visakhapatnam', lat: 17.6868, lon: 83.2185 },
+  { name: 'Gopalpur', lat: 19.30, lon: 84.97 },
+  { name: 'Puri', lat: 19.80, lon: 85.83 },
+  { name: 'Paradip', lat: 20.3165, lon: 86.6114 },
+  { name: 'Dhamra', lat: 20.80, lon: 86.96 },
+  { name: 'Digha', lat: 21.6266, lon: 87.51 },
+  { name: 'Haldia / Sagar Island', lat: 21.80, lon: 88.06 },
+];
+
+/**
+ * Checks if a coordinate is strictly in the sea/ocean offshore (e.g. East of East Coast, West of West Coast, South of Cape).
+ */
+export function isOffshoreSea(lat: number, lon: number): boolean {
+  // South of Kanyakumari (Indian Ocean)
+  if (lat < 8.05 && lon >= 76.5 && lon <= 80.0) return true;
+
+  // East Coast (Bay of Bengal):
+  if (lat >= 8.05 && lat <= 8.8 && lon > 78.20) return true; // Gulf of Mannar offshore
+  if (lat > 8.8 && lat <= 9.6 && lon > 79.45) return true;  // Palk Strait / Bay offshore
+  if (lat > 9.6 && lat <= 10.5 && lon > 79.35) return true;
+  if (lat > 10.5 && lat <= 11.5 && lon > 79.88) return true;
+  if (lat > 11.5 && lat <= 12.5 && lon > 79.85) return true;
+  if (lat > 12.5 && lat <= 13.6 && lon > 80.30) return true; // Offshore Chennai / Ennore
+  if (lat > 13.6 && lat <= 16.0 && lon > 80.15) return true; // Andhra Coast offshore
+  if (lat > 16.0 && lat <= 18.5 && lon > 83.30) return true; // Vizag offshore
+  if (lat > 18.5 && lat <= 21.0 && lon > 86.70) return true; // Odisha offshore
+  if (lat > 21.0 && lat <= 23.0 && lon > 87.55) return true; // WB offshore
+
+  // West Coast (Arabian Sea):
+  if (lat >= 8.05 && lat <= 10.5 && lon < 76.20) return true; // Kerala offshore
+  if (lat > 10.5 && lat <= 13.5 && lon < 74.75) return true;  // Karnataka offshore
+  if (lat > 13.5 && lat <= 16.0 && lon < 73.75) return true;  // Goa offshore
+  if (lat > 16.0 && lat <= 20.0 && lon < 72.80) return true;  // Mumbai offshore
+  if (lat > 20.0 && lat <= 24.0 && lon < 69.50) return true;  // Gujarat offshore
+
+  return false;
+}
+
+/**
+ * Calculates distance from (lat, lon) to nearest seashore/coastal point in kilometers.
+ */
+export function getDistanceToCoastKm(lat: number, lon: number): number {
+  if (isOffshoreSea(lat, lon)) {
+    return 0.0;
+  }
+  let minDist = Infinity;
+  for (const pt of COASTLINE_POINTS) {
+    const d = calculateHaversineDistance(lat, lon, pt.lat, pt.lon) / 1000.0;
+    if (d < minDist) minDist = d;
+  }
+  return Number(minDist.toFixed(1));
+}
+
+/**
+ * Determines whether a position is on land (inland) vs near seashore / marine waters.
+ * @param lat Latitude
+ * @param lon Longitude
+ * @param placeName Optional reverse geocoded place name or string
+ * @param coastalThresholdKm Distance threshold in km to consider "near seashore" (default: 15 km)
+ */
+export function isLocationInland(
+  lat: number,
+  lon: number,
+  placeName?: string,
+  coastalThresholdKm: number = 15.0
+): boolean {
+  // 1. If explicitly in offshore sea/ocean, it is NEVER inland
+  if (isOffshoreSea(lat, lon)) {
+    return false;
+  }
+
+  // 2. Check place name string if provided for known inland cities
+  if (placeName) {
+    const pLower = placeName.toLowerCase();
+    for (const kw of INLAND_CITIES_KEYWORDS) {
+      if (pLower.includes(kw)) {
+        return true;
+      }
+    }
+  }
+
+  // 3. Compute distance to closest seashore / coastal port
+  const distCoastKm = getDistanceToCoastKm(lat, lon);
+  return distCoastKm > coastalThresholdKm;
+}
+
+

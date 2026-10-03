@@ -1,4 +1,5 @@
 import { apiFetch } from './api';
+import { isLocationInland } from './navigationService';
 
 export interface INCOISSector {
   id: string;
@@ -75,6 +76,7 @@ export interface LiveMarineTelemetry {
   chlorophyllA: string;
   source: string;
   isLive: boolean;
+  isInland?: boolean;
 }
 
 // Fallback Sector Registry (Ocean Center Coordinates)
@@ -424,48 +426,65 @@ export async function fetchNearbyPFZ(lat: number, lon: number, sectorId?: string
   }
 }
 
-export async function fetchLiveMarineTelemetry(lat: number, lon: number): Promise<LiveMarineTelemetry> {
-  let waveHeightStr = '0.8m - 1.4m';
-  let wavePeriodStr = '8.2s';
-  let seaStateStr = 'Slight to Moderate';
+export async function fetchLiveMarineTelemetry(
+  lat: number,
+  lon: number,
+  placeName?: string
+): Promise<LiveMarineTelemetry> {
+  const inland = isLocationInland(lat, lon, placeName);
+
+  let waveHeightStr = inland ? '0.0 m' : '1.1m';
+  let wavePeriodStr = inland ? '0.0s' : '7.5s';
+  let seaStateStr = inland ? 'Inland Location (0.0 m)' : 'Calm to Moderate';
   let windSpeedStr = '12 - 16 kts';
   let windDirDeg = 175;
-  let oceanCurrentStr = '1.1 km/h';
-  let sstStr = '28.2°C';
-  let chlStr = '2.45 mg/m³';
+  let oceanCurrentStr = inland ? '0.0 km/h' : '1.1 km/h';
+  let sstStr = inland ? 'N/A (Inland)' : '28.2°C';
+  let chlStr = inland ? 'N/A (Inland)' : '2.45 mg/m³';
   let isLive = false;
 
-  // 1. Fetch live Open-Meteo Marine Data (Waves & Currents)
-  try {
-    const marineRes = await fetch(
-      `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&current=wave_height,wave_direction,wave_period,ocean_current_velocity`
-    );
-    if (marineRes.ok) {
-      const marineData = await marineRes.json();
-      if (marineData && marineData.current) {
-        const wh = marineData.current.wave_height;
-        if (wh !== undefined && wh !== null) {
-          waveHeightStr = `${wh.toFixed(1)}m`;
-          if (wh < 0.5) seaStateStr = 'Calm / Smooth';
-          else if (wh < 1.25) seaStateStr = 'Slight';
-          else if (wh < 2.0) seaStateStr = 'Moderate';
-          else if (wh < 3.0) seaStateStr = 'Rough';
-          else seaStateStr = 'Very Rough (High Seas)';
+  // 1. If NOT inland (near seashore or sea), fetch live Open-Meteo Marine Data (Waves & Currents)
+  if (!inland) {
+    try {
+      const marineRes = await fetch(
+        `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&current=wave_height,wave_direction,wave_period,ocean_current_velocity`
+      );
+      if (marineRes.ok) {
+        const marineData = await marineRes.json();
+        if (marineData && marineData.current) {
+          const wh = marineData.current.wave_height;
+          if (wh !== undefined && wh !== null) {
+            waveHeightStr = `${wh.toFixed(1)}m`;
+            if (wh < 0.2) seaStateStr = 'Calm (Glassy)';
+            else if (wh < 0.6) seaStateStr = 'Calm (Rippled)';
+            else if (wh < 1.25) seaStateStr = 'Smooth / Slight';
+            else if (wh < 2.0) seaStateStr = 'Moderate';
+            else if (wh < 3.0) seaStateStr = 'Rough';
+            else seaStateStr = 'Very Rough (High Seas)';
+          }
+          if (marineData.current.wave_period) {
+            wavePeriodStr = `${marineData.current.wave_period.toFixed(1)}s`;
+          }
+          if (marineData.current.ocean_current_velocity !== undefined && marineData.current.ocean_current_velocity !== null) {
+            oceanCurrentStr = `${marineData.current.ocean_current_velocity.toFixed(1)} km/h`;
+          }
+          isLive = true;
         }
-        if (marineData.current.wave_period) {
-          wavePeriodStr = `${marineData.current.wave_period.toFixed(1)}s`;
-        }
-        if (marineData.current.ocean_current_velocity !== undefined && marineData.current.ocean_current_velocity !== null) {
-          oceanCurrentStr = `${marineData.current.ocean_current_velocity.toFixed(1)} km/h`;
-        }
-        isLive = true;
       }
+    } catch (err) {
+      console.log('Open-Meteo Marine API fetch fallback:', err);
     }
-  } catch (err) {
-    console.log('Open-Meteo Marine API fetch fallback:', err);
+  } else {
+    // Strictly in land: waves and ocean currents are 0.0
+    waveHeightStr = '0.0 m';
+    wavePeriodStr = '0.0s';
+    seaStateStr = 'Inland Location (0.0 m)';
+    oceanCurrentStr = '0.0 km/h';
+    sstStr = 'N/A (Inland)';
+    chlStr = 'N/A (Inland)';
   }
 
-  // 2. Fetch live Open-Meteo Weather Data (Wind)
+  // 2. Fetch live Open-Meteo Weather Data (Wind) - works on both Land & Sea
   try {
     const weatherRes = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=wind_speed_10m,wind_direction_10m`
@@ -488,21 +507,23 @@ export async function fetchLiveMarineTelemetry(lat: number, lon: number): Promis
     console.log('Open-Meteo Weather API fetch fallback:', err);
   }
 
-  // 3. Fetch INCOIS oceanographic advisories (SST & Chlorophyll)
-  try {
-    const incoisAdvisory = await fetchAutoPFZ(lat, lon);
-    if (incoisAdvisory && incoisAdvisory.oceanographic_indicators) {
-      const ind = incoisAdvisory.oceanographic_indicators;
-      if (ind.sea_surface_temperature) sstStr = ind.sea_surface_temperature;
-      if (ind.chlorophyll_a) chlStr = ind.chlorophyll_a;
-      if (!isLive) {
-        if (ind.wave_height_meters) waveHeightStr = ind.wave_height_meters;
-        if (ind.wind_speed_knots) windSpeedStr = ind.wind_speed_knots;
-        if (ind.sea_state) seaStateStr = ind.sea_state;
+  // 3. Fetch INCOIS oceanographic advisories (SST & Chlorophyll) - only if near coast/sea
+  if (!inland) {
+    try {
+      const incoisAdvisory = await fetchAutoPFZ(lat, lon);
+      if (incoisAdvisory && incoisAdvisory.oceanographic_indicators) {
+        const ind = incoisAdvisory.oceanographic_indicators;
+        if (ind.sea_surface_temperature) sstStr = ind.sea_surface_temperature;
+        if (ind.chlorophyll_a) chlStr = ind.chlorophyll_a;
+        if (!isLive) {
+          if (ind.wave_height_meters) waveHeightStr = ind.wave_height_meters;
+          if (ind.wind_speed_knots) windSpeedStr = ind.wind_speed_knots;
+          if (ind.sea_state) seaStateStr = ind.sea_state;
+        }
       }
+    } catch (err) {
+      console.log('INCOIS Advisory fetch fallback:', err);
     }
-  } catch (err) {
-    console.log('INCOIS Advisory fetch fallback:', err);
   }
 
   return {
@@ -514,7 +535,12 @@ export async function fetchLiveMarineTelemetry(lat: number, lon: number): Promis
     oceanCurrentVelocity: oceanCurrentStr,
     seaSurfaceTemperature: sstStr,
     chlorophyllA: chlStr,
-    source: isLive ? 'Live INCOIS & Open-Meteo Ocean Telemetry' : 'INCOIS Ocean Advisory',
+    source: inland
+      ? 'Live Atmospheric Telemetry (Inland)'
+      : isLive
+      ? 'Live INCOIS & Open-Meteo Ocean Telemetry'
+      : 'INCOIS Ocean Advisory',
     isLive: isLive || true,
+    isInland: inland,
   };
 }

@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-# SamudraKural
-A conversational AI platform that helps fishermen understand ocean conditions, PFZ intelligence, and marine data.
-=======
 # 🌊 Samudra Kural (சமுத்திரக் குரல்)
 
 > **A Next-Generation Conversational AI & Ocean Intelligence Platform for Fishermen and Coastal Guard Command.**
@@ -176,4 +172,3 @@ pytest -v
 
 ## 📄 License
 This project is licensed under the [MIT License](LICENSE).
->>>>>>> c1c553c (feat: complete Samudra Kural platform with real-time ocean intelligence, IBL geofencing, Coastal Guard command center, and Gemini 2.0 AI)

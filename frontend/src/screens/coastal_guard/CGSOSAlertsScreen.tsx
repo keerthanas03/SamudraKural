@@ -25,29 +25,44 @@ export const CGSOSAlertsScreen: React.FC<CGSOSAlertsScreenProps> = ({
   onBack,
   hideTopHeader = false,
 }) => {
-  const [alerts, setAlerts] = useState<SOSAlertItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [rawAlerts, setRawAlerts] = useState<SOSAlertItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [activeFilter, setActiveFilter] = useState<string>('ACTIVE');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   useEffect(() => {
-    fetchAlerts(false);
+    // 1. Instant cache hydration (< 50ms)
+    coastalGuardService.getLocalAlerts().then((cached) => {
+      if (cached && cached.length > 0) {
+        setRawAlerts(cached);
+      }
+    });
+
+    // 2. Immediate silent network sync
+    fetchAlerts(true);
+
+    // 3. Real-time subscription to SOS alert broadcasts
+    const unsubscribe = coastalGuardService.subscribeToSOS(() => {
+      fetchAlerts(true);
+    });
+
+    // 4. Background polling
     const timer = setInterval(() => {
       fetchAlerts(true);
-    }, 3000);
-    return () => clearInterval(timer);
-  }, [activeFilter, searchQuery]);
+    }, 4000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(timer);
+    };
+  }, []);
 
   const fetchAlerts = async (isSilent: boolean = false) => {
-    if (!isSilent) setLoading(true);
+    if (!isSilent && rawAlerts.length === 0) setLoading(true);
     try {
-      const data = await coastalGuardService.getSOSAlerts(
-        activeFilter,
-        undefined,
-        searchQuery.trim() || undefined
-      );
-      setAlerts(data);
+      const data = await coastalGuardService.getSOSAlerts('ALL');
+      setRawAlerts(data);
     } catch (e) {
       console.log('[CGSOSAlerts] Fetch error:', e);
     } finally {
@@ -60,6 +75,32 @@ export const CGSOSAlertsScreen: React.FC<CGSOSAlertsScreenProps> = ({
     setRefreshing(true);
     fetchAlerts(false);
   };
+
+  // Instant 0ms in-memory filtering & search
+  const filteredAlerts = React.useMemo(() => {
+    let result = rawAlerts;
+
+    if (activeFilter === 'ACTIVE') {
+      result = result.filter(a => a.status !== 'RESOLVED' && a.status !== 'CANCELLED' && a.status !== 'FALSE_ALARM');
+    } else if (activeFilter === 'RESOLVED') {
+      result = result.filter(a => a.status === 'RESOLVED');
+    } else if (['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(activeFilter)) {
+      result = result.filter(a => a.priority === activeFilter);
+    }
+
+    if (searchQuery.trim()) {
+      const s = searchQuery.toLowerCase().trim();
+      result = result.filter(
+        a =>
+          a.emergency_type.toLowerCase().includes(s) ||
+          (a.boat && a.boat.name.toLowerCase().includes(s)) ||
+          (a.fisherman && a.fisherman.name.toLowerCase().includes(s)) ||
+          (a.description && a.description.toLowerCase().includes(s))
+      );
+    }
+
+    return result;
+  }, [rawAlerts, activeFilter, searchQuery]);
 
   const getPriorityStyle = (priority: string) => {
     switch (priority) {
@@ -133,7 +174,7 @@ export const CGSOSAlertsScreen: React.FC<CGSOSAlertsScreenProps> = ({
       >
         {loading ? (
           <ActivityIndicator size="large" color={Colors.cgPrimary} style={{ marginVertical: 40 }} />
-        ) : alerts.length === 0 ? (
+        ) : filteredAlerts.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyIcon}>🚨</Text>
             <Text style={styles.emptyTitle}>No SOS Alerts Found</Text>
@@ -142,7 +183,7 @@ export const CGSOSAlertsScreen: React.FC<CGSOSAlertsScreenProps> = ({
             </Text>
           </View>
         ) : (
-          alerts.map((alert) => {
+          filteredAlerts.map((alert) => {
             const priorityTheme = getPriorityStyle(alert.priority);
 
             return (

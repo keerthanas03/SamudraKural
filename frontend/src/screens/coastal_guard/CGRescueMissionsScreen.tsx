@@ -22,24 +22,35 @@ export const CGRescueMissionsScreen: React.FC<CGRescueMissionsScreenProps> = ({
   onSelectMission,
   hideTopHeader = false,
 }) => {
-  const [missions, setMissions] = useState<RescueMissionItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [rawMissions, setRawMissions] = useState<RescueMissionItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'ACTIVE' | 'COMPLETED' | 'CANCELLED'>('ACTIVE');
 
   useEffect(() => {
-    fetchMissions(false);
+    // 1. Instant cache hydration (< 50ms)
+    coastalGuardService.getLocalMissions().then((cached) => {
+      if (cached && cached.length > 0) {
+        setRawMissions(cached);
+      }
+    });
+
+    // 2. Immediate silent network sync
+    fetchMissions(true);
+
+    // 3. Background polling
     const timer = setInterval(() => {
       fetchMissions(true);
-    }, 3000);
+    }, 4000);
+
     return () => clearInterval(timer);
-  }, [activeTab]);
+  }, []);
 
   const fetchMissions = async (isSilent: boolean = false) => {
-    if (!isSilent) setLoading(true);
+    if (!isSilent && rawMissions.length === 0) setLoading(true);
     try {
-      const data = await coastalGuardService.getMissions(activeTab);
-      setMissions(data);
+      const data = await coastalGuardService.getMissions('ALL');
+      setRawMissions(data);
     } catch (e) {
       console.log('[CGRescueMissions] Fetch error:', e);
     } finally {
@@ -50,8 +61,20 @@ export const CGRescueMissionsScreen: React.FC<CGRescueMissionsScreenProps> = ({
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchMissions();
+    fetchMissions(false);
   };
+
+  // Instant 0ms in-memory filtering by tab
+  const filteredMissions = React.useMemo(() => {
+    if (activeTab === 'ACTIVE') {
+      return rawMissions.filter(m => m.status !== 'COMPLETED' && m.status !== 'CANCELLED');
+    } else if (activeTab === 'COMPLETED') {
+      return rawMissions.filter(m => m.status === 'COMPLETED');
+    } else if (activeTab === 'CANCELLED') {
+      return rawMissions.filter(m => m.status === 'CANCELLED');
+    }
+    return rawMissions;
+  }, [rawMissions, activeTab]);
 
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -68,7 +91,7 @@ export const CGRescueMissionsScreen: React.FC<CGRescueMissionsScreenProps> = ({
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.cgPrimaryDark} />
 
       {/* Header */}
@@ -104,14 +127,14 @@ export const CGRescueMissionsScreen: React.FC<CGRescueMissionsScreenProps> = ({
       >
         {loading ? (
           <ActivityIndicator size="large" color={Colors.cgPrimary} style={{ marginVertical: 40 }} />
-        ) : missions.length === 0 ? (
+        ) : filteredMissions.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyIcon}>🛥️</Text>
             <Text style={styles.emptyTitle}>No Rescue Missions Found</Text>
             <Text style={styles.emptySub}>There are currently no missions in the {activeTab.toLowerCase()} state.</Text>
           </View>
         ) : (
-          missions.map((mission) => {
+          filteredMissions.map((mission) => {
             const statusTheme = getStatusStyle(mission.status);
 
             return (
@@ -152,7 +175,7 @@ export const CGRescueMissionsScreen: React.FC<CGRescueMissionsScreenProps> = ({
           })
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -17,6 +17,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
+import { getCurrentFishermanGPS } from '../utils/location';
+import { subscribeToLocation, getCurrentLocation } from '../services/locationService';
 import { Colors } from '../theme/colors';
 import { SupportedLanguage } from '../types';
 import { useLanguage } from '../i18n';
@@ -57,60 +59,77 @@ interface BotScreenProps {
 
 const QUICK_PROMPTS: Record<string, string[]> = {
   ta: [
-    'சென்னை கடலில் நாளை நான் மீன்பிடிக்க போகலாமா?',
-    'சிறந்த கானாங்களுத்தி மீன்பிடி மண்டலம் எங்கே?',
-    'காற்றின் வேகம் மற்றும் அலை உயரம் எவ்வளவு?',
-    'தொலைந்த வலை எங்கே மிதந்து கொண்டிருக்கும்?',
-    'புயல் அல்லது ஆபத்து எச்சரிக்கை உள்ளதா?',
+    'எனது இருப்பிடத்திலிருந்து நாளை நான் மீன்பிடிக்க போகலாமா?',
+    'என்னைச் சுற்றியுள்ள சிறந்த மீன்பிடி மண்டலம் (PFZ) எங்கே?',
+    'இங்கு நேரலை காற்றின் வேகம் மற்றும் அலை உயரம் எவ்வளவு?',
+    'எனது தொலைந்த வலை எங்கே மிதந்து கொண்டிருக்கும்?',
+    'இப்பகுதியில் புயல் அல்லது ஆபத்து எச்சரிக்கை உள்ளதா?',
   ],
   te: [
-    'రేపు చెన్నై నుండి చేపల వేటకు వెళ్ళవచ్చా?',
-    'సమీపంలో ఉన్న ఉత్తమ చేపల వేట ప్రాంతం ఎక్కడ ఉంది?',
-    'గాలి వేగం మరియు అలల ఎత్తు ఎంత?',
+    'నా స్థానం నుండి రేపు చేపల వేటకు వెళ్ళవచ్చా?',
+    'నా సమీపంలో ఉన్న ఉత్తమ చేపల వేట ప్రాంతం ఎక్కడ ఉంది?',
+    'ఇక్కడ గాలి వేగం మరియు అలల ఎత్తు ఎంత?',
     'నా పోయిన వల ఎక్కడ కొట్టుకుపోతోంది?',
+    'ఈ ప్రాంతంలో తుఫాను లేదా ప్రమాద హెచ్చరిక ఉందా?',
   ],
   ml: [
-    'എനിക്ക് നാളെ ചെന്നൈയിൽ നിന്ന് മീൻപിടിക്കാൻ പോകാൻ സാധിക്കുമോ?',
-    'അടുത്തുള്ള മികച്ച മത്സ്യബന്ധന മേഖല എവിടെയാണ്?',
-    'കാറ്റിന്റെ വേഗതയും തിരമാല ഉയരവും എത്രയാണ്?',
+    'എന്റെ ലൊക്കേഷനിൽ നിന്ന് നാളെ മീൻപിടിക്കാൻ പോകാമോ?',
+    'എനിക്ക് അടുത്തുള്ള മികച്ച മത്സ്യബന്ധന മേഖല എവിടെയാണ്?',
+    'ഇവിടെ കാറ്റിന്റെ വേഗതയും തിരമാല ഉയരവും എത്രയാണ്?',
+    'എന്റെ കാണാതായ വല എവിടെ ഒഴുകുന്നു?',
+    'ഈ പ്രദേശത്ത് ചുഴലിക്കാറ്റ് അല്ലെങ്കിൽ മുന്നറിയിപ്പ് ഉണ്ടോ?',
   ],
   hi: [
-    'क्या मैं कल चेन्नई से मछली पकड़ने जा सकता हूँ?',
-    'निकटतम सर्वोत्तम मत्स्य क्षेत्र कहाँ है?',
-    'हवा की गति और लहरों की ऊँचाई कितनी है?',
+    'क्या मैं अपने स्थान से कल मछली पकड़ने जा सकता हूँ?',
+    'मेरे निकटतम सर्वोत्तम मत्स्य क्षेत्र (PFZ) कहाँ है?',
+    'यहाँ हवा की गति और लहरों की ऊँचाई कितनी है?',
+    'मेरा खोया हुआ जाल कहाँ बह रहा है?',
+    'क्या इस क्षेत्र में कोई तूफान या चक्रवात चेतावनी है?',
   ],
   mr: [
-    'मी उद्या मासेमारीसाठी समुद्रात जाऊ शकतो का?',
-    'जवळचे सर्वोत्तम मासेमारी क्षेत्र कुठे आहे?',
-    'वाऱ्याचा वेग आणि लाटांची उंची किती आहे?',
+    'माझ्या स्थानावरून मी उद्या मासेमारीसाठी जाऊ शकतो का?',
+    'माझ्या जवळचे सर्वोत्तम मासेमारी क्षेत्र कुठे आहे?',
+    'येथे वाऱ्याचा वेग आणि लाटांची उंची किती आहे?',
+    'माझे हरवलेले जाळे कुठे वाहत आहे?',
+    'या भागात काही वादळ किंवा धोक्याचा इशारा आहे का?',
   ],
   gu: [
-    'શું હું આવતીકાલે માછીમારી માટે જઈ શકું?',
-    'નજીકનો શ્રેષ્ઠ માછીમારી વિસ્તાર ક્યાં છે?',
-    'પવનની ગતિ અને મોજાની ઊંચાઈ કેટલી છે?',
+    'મારા સ્થાન પરથી શું હું આવતીકાલે માછીમારી માટે જઈ શકું?',
+    'મારી નજીકનો શ્રેષ્ઠ માછીમારી વિસ્તાર ક્યાં છે?',
+    'અહીં પવનની ગતિ અને મોજાની ઊંચાઈ કેટલી છે?',
+    'મારી ખોવાયેલી જાળ ક્યાં તણાઈ રહી છે?',
+    'આ વિસ્તારમાં કોઈ વાવાઝોડું કે ચેતવણી છે?',
   ],
   or: [
-    'ମୁଁ ଆସନ୍ତାକାଲି ମାଛ ଧରିବାକୁ ଯାଇପାରିବି କି?',
-    'ନିକଟତମ ସର୍ବୋତ୍ତମ ମତ୍ସ୍ୟ କ୍ଷେତ୍ର କେଉଁଠାରେ ଅଛି?',
-    'ପବନର ଗତି ଏବଂ ତରଙ୍ଗର ଉଚ୍ଚତା କେତେ?',
+    'ମୋ ସ୍ଥାନରୁ ଆସନ୍ତାକାଲି ମାଛ ଧରିବାକୁ ଯାଇପାରିବି କି?',
+    'ମୋ ନିକଟତମ ସର୍ବୋତ୍ତମ ମତ୍ସ୍ୟ କ୍ଷେତ୍ର କେଉଁଠାରେ ଅଛି?',
+    'ଏଠାରେ ପବନର ଗତି ଏବଂ ତରଙ୍ଗର ଉଚ୍ଚତା କେତେ?',
+    'ମୋର ହଜିଯାଇଥିବା ଜାଲ କେଉଁଠାରେ ଭାସୁଛି?',
+    'ଏହି ଅଞ୍ଚଳରେ କୌଣସି ଝଡ଼ କିମ୍ବା ବିପଦ ଚେତାବନୀ ଅଛି କି?',
   ],
   kn: [
-    'ನಾನು ನಾಳೆ ಮೀನುಗಾರಿಕೆಗೆ ಹೋಗಬಹುದೇ?',
-    'ಹತ್ತಿರದ ಅತ್ಯುತ್ತಮ ಮೀನುಗಾರಿಕಾ ವಲಯ ಎಲ್ಲಿದೆ?',
-    'ಗಾಳಿಯ ವೇಗ ಮತ್ತು ಅಲೆಗಳ ಎತ್ತರ ಎಷ್ಟು?',
+    'ನನ್ನ ಸ್ಥಳದಿಂದ ನಾನು ನಾಳೆ ಮೀನುಗಾರಿಕೆಗೆ ಹೋಗಬಹುದೇ?',
+    'ನನ್ನ ಹತ್ತಿರದ ಅತ್ಯುತ್ತಮ ಮೀನುಗಾರಿಕಾ ವಲಯ ಎಲ್ಲಿದೆ?',
+    'ಇಲ್ಲಿ ಗಾಳಿಯ ವೇಗ ಮತ್ತು ಅಲೆಗಳ ಎತ್ತರ ಎಷ್ಟು?',
+    'ನನ್ನ ಕಳೆದುಹೋದ ಬಲೆ ಎಲ್ಲಿ ತೇಲುತ್ತಿದೆ?',
+    'ಈ ಪ್ರದೇಶದಲ್ಲಿ ಚಂಡಮಾರುತ ಅಥವಾ ಅಪಾಯದ ಎಚ್ಚರಿಕೆ ಇದೆಯೇ?',
   ],
   bn: [
-    'আমি কি আগামীকাল মাছ ধরতে যেতে পারি?',
-    'কাছাকাছি সেরা মাছ ধরার অঞ্চল কোথায়?',
-    'বাতাসের গতি এবং ঢেউয়ের উচ্চতা কত?',
+    'আমার অবস্থান থেকে আমি কি আগামীকাল মাছ ধরতে যেতে পারি?',
+    'আমার কাছাকাছি সেরা মাছ ধরার অঞ্চল কোথায়?',
+    'এখানে বাতাসের গতি এবং ঢেউয়ের উচ্চতা কত?',
+    'আমার হারিয়ে যাওয়া জাল কোথায় ভাসছে?',
+    'কোনো ঝড় বা বিপদের সতর্কতা আছে কি?',
   ],
   en: [
-    'Can I go fishing tomorrow from Chennai, and where should I go?',
-    'Where is the nearest best Mackerel potential fishing zone?',
-    'What is the live wind speed and wave height?',
-    'Where is my lost net drifting from 13.08N, 80.38E?',
+    'Can I go fishing tomorrow from my current location?',
+    'Where is the nearest best potential fishing zone (PFZ) around me?',
+    'What is the live wind speed and wave height here?',
+    'Where is my lost net drifting from my position?',
+    'Is there any cyclone or high wave alert active in my area?',
   ],
 };
+
 
 export const BotScreen: React.FC<BotScreenProps> = ({
   currentLanguage,
@@ -155,18 +174,23 @@ export const BotScreen: React.FC<BotScreenProps> = ({
   }, [messages]);
 
   useEffect(() => {
-    // Fetch live device location for precise agent calculations
-    Location.requestForegroundPermissionsAsync().then(({ status }) => {
-      if (status === 'granted') {
-        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
-          .then((loc) => {
-            if (loc && loc.coords) {
-              setUserLocation({ lat: loc.coords.latitude, lon: loc.coords.longitude });
-            }
-          })
-          .catch(() => {});
+    // 1. Subscribe to continuous real-time phone GPS updates
+    const unsubscribe = subscribeToLocation((loc) => {
+      if (loc && typeof loc.latitude === 'number' && typeof loc.longitude === 'number') {
+        setUserLocation({ lat: loc.latitude, lon: loc.longitude });
       }
     });
+
+    // 2. Immediate device GPS hardware fetch
+    getCurrentFishermanGPS().then((pos) => {
+      if (pos && typeof pos.latitude === 'number' && typeof pos.longitude === 'number') {
+        setUserLocation({ lat: pos.latitude, lon: pos.longitude });
+      }
+    }).catch(() => {});
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Stop audio speech when navigating away from screen
@@ -231,10 +255,24 @@ export const BotScreen: React.FC<BotScreenProps> = ({
     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
 
     try {
+      // Ensure the query is evaluated against the user's freshest up-to-the-second GPS location
+      let liveLat = userLocation.lat;
+      let liveLon = userLocation.lon;
+      try {
+        const freshLoc = await getCurrentLocation();
+        if (freshLoc && typeof freshLoc.latitude === 'number' && typeof freshLoc.longitude === 'number') {
+          liveLat = freshLoc.latitude;
+          liveLon = freshLoc.longitude;
+          setUserLocation({ lat: liveLat, lon: liveLon });
+        }
+      } catch (locErr) {
+        console.log('[BotScreen] Using active GPS state:', locErr);
+      }
+
       const response = await askOrcaBot(
         textToSend,
-        userLocation.lat,
-        userLocation.lon,
+        liveLat,
+        liveLon,
         'Trawler',
         activeLanguage
       );
@@ -517,6 +555,30 @@ export const BotScreen: React.FC<BotScreenProps> = ({
         </ScrollView>
       </View>
 
+      {/* Real-time GPS Locked Status Bar */}
+      <View style={styles.gpsStatusBar}>
+        <View style={styles.gpsStatusLeft}>
+          <View style={styles.gpsActiveDot} />
+          <Text style={styles.gpsStatusTxt}>
+            📍 Live GPS: {userLocation.lat.toFixed(4)}°N, {userLocation.lon.toFixed(4)}°E
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={async () => {
+            try {
+              const loc = await getCurrentLocation();
+              if (loc && typeof loc.latitude === 'number' && typeof loc.longitude === 'number') {
+                setUserLocation({ lat: loc.latitude, lon: loc.longitude });
+              }
+            } catch (e) {}
+          }}
+          activeOpacity={0.7}
+          style={styles.gpsRefreshBtn}
+        >
+          <Text style={styles.gpsRefreshTxt}>🔄 Sync GPS</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Scrollable Message List */}
       <ScrollView
         ref={scrollViewRef}
@@ -722,15 +784,19 @@ export const BotScreen: React.FC<BotScreenProps> = ({
       {/* Quick Action Suggestion Chips Bar */}
       <View style={styles.quickPromptsSection}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickPromptsRow}>
-          {currentPrompts.map((prompt, idx) => (
-            <TouchableOpacity
-              key={idx}
-              style={styles.quickChip}
-              onPress={() => handleSend(prompt, false)}
-            >
-              <Text style={styles.quickChipTxt}>💡 {prompt}</Text>
-            </TouchableOpacity>
-          ))}
+          {currentPrompts.slice(0, 5).map((prompt, idx) => {
+            const icons = ['🎣', '🐟', '💨', '🕸️', '⚓'];
+            return (
+              <TouchableOpacity
+                key={idx}
+                style={styles.quickChip}
+                onPress={() => handleSend(prompt, false)}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.quickChipTxt}>{icons[idx] || '💡'} {prompt}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </View>
 
@@ -914,6 +980,43 @@ const styles = StyleSheet.create({
   langChipTxtActive: {
     color: '#FFFFFF',
   },
+  gpsStatusBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#DCFCE7',
+  },
+  gpsStatusLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  gpsActiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  gpsStatusTxt: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#065F46',
+  },
+  gpsRefreshBtn: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  gpsRefreshTxt: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#047857',
+  },
   messageList: {
     flex: 1,
   },
@@ -1007,6 +1110,55 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: 0.15,
     marginBottom: 14,
+  },
+  sampleQuestionsContainer: {
+    backgroundColor: Colors.background,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  sampleQuestionsHeader: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.primaryDark,
+    marginBottom: 8,
+    letterSpacing: 0.3,
+  },
+  sampleQuestionCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  sampleQuestionTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  sampleQuestionBadge: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: Colors.primary,
+    backgroundColor: 'rgba(30, 58, 138, 0.08)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  sampleQuestionArrow: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: Colors.primary,
+  },
+  sampleQuestionTxt: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: Colors.text,
+    lineHeight: 18,
   },
   voicePlayBtn: {
     backgroundColor: Colors.secondary,

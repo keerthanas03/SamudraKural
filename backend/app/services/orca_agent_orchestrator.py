@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 env_aggregator = UnifiedEnvironmentService()
 _WEATHER_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_GEOCODE_CACHE: Dict[str, Tuple[float, str, bool]] = {}
 
 class AgentExecutionStep(BaseModel):
     agent_id: int
@@ -57,31 +58,61 @@ class OrcaChatResponse(BaseModel):
     quick_actions: List[Dict[str, str]]
     community_reports: List[Dict[str, Any]]
 
-# Verified Real Indian Coastal Ports & Fisheries Harbours Database
+# Verified Real Indian Coastal Ports & Major Fisheries Harbours Database
 INDIAN_COASTAL_PORTS = [
-    {"name": "Port of Chennai (Harbour Entrance)", "state": "Tamil Nadu", "lat": 13.0827, "lon": 80.2925, "depth_m": 19, "vhf": "VHF Ch 16 / 12 (156.8 MHz)"},
+    # Tamil Nadu & Puducherry
+    {"name": "Port of Chennai", "state": "Tamil Nadu", "lat": 13.0827, "lon": 80.2925, "depth_m": 19, "vhf": "VHF Ch 16 / 12 (156.8 MHz)"},
     {"name": "Kamarajar Port (Ennore)", "state": "Tamil Nadu", "lat": 13.2612, "lon": 80.3340, "depth_m": 16, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Mahabalipuram Coastal Landing", "state": "Tamil Nadu", "lat": 12.6167, "lon": 80.1928, "depth_m": 8, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Puducherry Port & Fishing Harbour", "state": "Puducherry", "lat": 11.9139, "lon": 79.8145, "depth_m": 9, "vhf": "VHF Ch 16 (156.8 MHz)"},
     {"name": "Cuddalore Port & Fishing Harbour", "state": "Tamil Nadu", "lat": 11.7042, "lon": 79.7725, "depth_m": 9, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Karaikal Port & Fishing Harbour", "state": "Puducherry", "lat": 10.9254, "lon": 79.8380, "depth_m": 14, "vhf": "VHF Ch 16 (156.8 MHz)"},
     {"name": "Nagapattinam Fishing Harbour", "state": "Tamil Nadu", "lat": 10.7607, "lon": 79.8458, "depth_m": 8, "vhf": "VHF Ch 16 (156.8 MHz)"},
-    {"name": "Rameswaram Fishing Jetty", "state": "Tamil Nadu", "lat": 9.2876, "lon": 79.3129, "depth_m": 6, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Mallipattinam Fishing Harbour", "state": "Tamil Nadu", "lat": 10.2789, "lon": 79.3175, "depth_m": 6, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Rameswaram Fishing Jetty & Mandapam", "state": "Tamil Nadu", "lat": 9.2876, "lon": 79.3129, "depth_m": 6, "vhf": "VHF Ch 16 (156.8 MHz)"},
     {"name": "V.O. Chidambaranar Port (Tuticorin)", "state": "Tamil Nadu", "lat": 8.7533, "lon": 78.1969, "depth_m": 14, "vhf": "VHF Ch 16 / 14 (156.8 MHz)"},
+    {"name": "Colachel Fishing Harbour", "state": "Tamil Nadu", "lat": 8.1764, "lon": 77.2567, "depth_m": 8, "vhf": "VHF Ch 16 (156.8 MHz)"},
     {"name": "Kanyakumari Harbour", "state": "Tamil Nadu", "lat": 8.0780, "lon": 77.5550, "depth_m": 10, "vhf": "VHF Ch 16 (156.8 MHz)"},
+
+    # Kerala
     {"name": "Vizhinjam International Seaport", "state": "Kerala", "lat": 8.3753, "lon": 76.9890, "depth_m": 20, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Kollam (Neendakara) Fishing Harbour", "state": "Kerala", "lat": 8.9392, "lon": 76.5367, "depth_m": 8, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Alappuzha (Thottappally) Harbour", "state": "Kerala", "lat": 9.3175, "lon": 76.3814, "depth_m": 7, "vhf": "VHF Ch 16 (156.8 MHz)"},
     {"name": "Cochin / Kochi Port & Fisheries Harbour", "state": "Kerala", "lat": 9.9658, "lon": 76.2673, "depth_m": 14, "vhf": "VHF Ch 16 / 13 (156.8 MHz)"},
+    {"name": "Munambam Fisheries Harbour", "state": "Kerala", "lat": 10.1794, "lon": 76.1689, "depth_m": 8, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Beypore / Kozhikode Port", "state": "Kerala", "lat": 11.1643, "lon": 75.8042, "depth_m": 8, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Kannur (Ayikkara) Fishing Harbour", "state": "Kerala", "lat": 11.8745, "lon": 75.3704, "depth_m": 7, "vhf": "VHF Ch 16 (156.8 MHz)"},
+
+    # Karnataka & Goa
     {"name": "New Mangalore Port (Panambur)", "state": "Karnataka", "lat": 12.9288, "lon": 74.8184, "depth_m": 15, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Malpe Fishing Harbour", "state": "Karnataka", "lat": 13.3512, "lon": 74.7011, "depth_m": 8, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Karwar Port & Fishing Harbour", "state": "Karnataka", "lat": 14.8080, "lon": 74.1306, "depth_m": 9, "vhf": "VHF Ch 16 (156.8 MHz)"},
     {"name": "Mormugao Port (Goa)", "state": "Goa", "lat": 15.4144, "lon": 73.8016, "depth_m": 14, "vhf": "VHF Ch 16 (156.8 MHz)"},
-    {"name": "Mumbai Port (MbPT)", "state": "Maharashtra", "lat": 18.9500, "lon": 72.8500, "depth_m": 14, "vhf": "VHF Ch 16 / 12 (156.8 MHz)"},
+
+    # Maharashtra & Gujarat
+    {"name": "Ratnagiri (Mirkarwada) Harbour", "state": "Maharashtra", "lat": 16.9902, "lon": 73.3120, "depth_m": 8, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Mumbai Port & Sasoon Dock", "state": "Maharashtra", "lat": 18.9500, "lon": 72.8500, "depth_m": 14, "vhf": "VHF Ch 16 / 12 (156.8 MHz)"},
     {"name": "Jawaharlal Nehru Port (JNPT)", "state": "Maharashtra", "lat": 18.9500, "lon": 72.9500, "depth_m": 14, "vhf": "VHF Ch 16 / 13 (156.8 MHz)"},
+    {"name": "Veraval Fisheries Harbour", "state": "Gujarat", "lat": 20.9000, "lon": 70.3667, "depth_m": 9, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Porbandar Port & Harbour", "state": "Gujarat", "lat": 21.6417, "lon": 69.6000, "depth_m": 10, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Okha Port", "state": "Gujarat", "lat": 22.4667, "lon": 69.0667, "depth_m": 11, "vhf": "VHF Ch 16 (156.8 MHz)"},
     {"name": "Deendayal Port (Kandla)", "state": "Gujarat", "lat": 23.0033, "lon": 70.2192, "depth_m": 13, "vhf": "VHF Ch 16 (156.8 MHz)"},
+
+    # Andhra Pradesh, Odisha & West Bengal
     {"name": "Krishnapatnam Port", "state": "Andhra Pradesh", "lat": 14.2500, "lon": 80.1250, "depth_m": 18, "vhf": "VHF Ch 16 (156.8 MHz)"},
-    {"name": "Visakhapatnam Port", "state": "Andhra Pradesh", "lat": 17.6933, "lon": 83.2986, "depth_m": 18, "vhf": "VHF Ch 16 / 12 (156.8 MHz)"},
+    {"name": "Machilipatnam Fishing Harbour", "state": "Andhra Pradesh", "lat": 16.1833, "lon": 81.1333, "depth_m": 7, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Kakinada Deep Water Port", "state": "Andhra Pradesh", "lat": 16.9891, "lon": 82.2475, "depth_m": 14, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Visakhapatnam Port & Fishing Harbour", "state": "Andhra Pradesh", "lat": 17.6933, "lon": 83.2986, "depth_m": 18, "vhf": "VHF Ch 16 / 12 (156.8 MHz)"},
+    {"name": "Gopalpur Port", "state": "Odisha", "lat": 19.2611, "lon": 84.9083, "depth_m": 12, "vhf": "VHF Ch 16 (156.8 MHz)"},
     {"name": "Paradip Port", "state": "Odisha", "lat": 20.2644, "lon": 86.6714, "depth_m": 17, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Dhamra Port", "state": "Odisha", "lat": 20.7936, "lon": 86.9786, "depth_m": 18, "vhf": "VHF Ch 16 (156.8 MHz)"},
+    {"name": "Digha (Sankarpur) Fishing Harbour", "state": "West Bengal", "lat": 21.6266, "lon": 87.5074, "depth_m": 7, "vhf": "VHF Ch 16 (156.8 MHz)"},
     {"name": "Syama Prasad Mookerjee Port (Haldia)", "state": "West Bengal", "lat": 22.0200, "lon": 88.0600, "depth_m": 12, "vhf": "VHF Ch 16 (156.8 MHz)"},
     {"name": "Port Blair Port", "state": "Andaman & Nicobar", "lat": 11.6667, "lon": 92.7333, "depth_m": 15, "vhf": "VHF Ch 16 (156.8 MHz)"},
 ]
 
 KNOWN_LOCATIONS: Dict[str, Dict[str, Any]] = {
-    # Tamil Nadu Cities & Ports
+    # Tamil Nadu Cities, Towns & Ports
     "madurai": {"name": "Madurai", "lat": 9.9252, "lon": 78.1198, "is_inland": True},
     "மதுரை": {"name": "மதுரை (Madurai)", "lat": 9.9252, "lon": 78.1198, "is_inland": True},
     "मदुरै": {"name": "मदुरै (Madurai)", "lat": 9.9252, "lon": 78.1198, "is_inland": True},
@@ -114,12 +145,18 @@ KNOWN_LOCATIONS: Dict[str, Dict[str, Any]] = {
     "nagapattinam": {"name": "Nagapattinam", "lat": 10.7672, "lon": 79.8449, "is_inland": False},
     "நாகப்பட்டினம்": {"name": "நாகப்பட்டினம் (Nagapattinam)", "lat": 10.7672, "lon": 79.8449, "is_inland": False},
     "नागपट्टिनम": {"name": "नागपट्टिनम (Nagapattinam)", "lat": 10.7672, "lon": 79.8449, "is_inland": False},
+    "puducherry": {"name": "Puducherry (Pondicherry)", "lat": 11.9139, "lon": 79.8145, "is_inland": False},
+    "pondicherry": {"name": "Puducherry (Pondicherry)", "lat": 11.9139, "lon": 79.8145, "is_inland": False},
+    "புதுச்சேரி": {"name": "புதுச்சேரி (Puducherry)", "lat": 11.9139, "lon": 79.8145, "is_inland": False},
+    "பாண்டிச்சேரி": {"name": "பாண்டிச்சேரி (Puducherry)", "lat": 11.9139, "lon": 79.8145, "is_inland": False},
     "coimbatore": {"name": "Coimbatore", "lat": 11.0168, "lon": 76.9558, "is_inland": True},
     "கோயம்புத்தூர்": {"name": "கோயம்புத்தூர் (Coimbatore)", "lat": 11.0168, "lon": 76.9558, "is_inland": True},
     "कोयंबटूर": {"name": "कोयंबटूर (Coimbatore)", "lat": 11.0168, "lon": 76.9558, "is_inland": True},
     "trichy": {"name": "Tiruchirappalli", "lat": 10.7905, "lon": 78.7047, "is_inland": True},
     "திருச்சி": {"name": "திருச்சி (Tiruchirappalli)", "lat": 10.7905, "lon": 78.7047, "is_inland": True},
     "तिरुचिरापल्ली": {"name": "तिरुचिरापल्ली (Trichy)", "lat": 10.7905, "lon": 78.7047, "is_inland": True},
+    "salem": {"name": "Salem", "lat": 11.6643, "lon": 78.1460, "is_inland": True},
+    "சேலம்": {"name": "சேலம் (Salem)", "lat": 11.6643, "lon": 78.1460, "is_inland": True},
 
     # Kerala Cities & Ports
     "kochi": {"name": "Kochi", "lat": 9.9312, "lon": 76.2673, "is_inland": False},
@@ -134,6 +171,8 @@ KNOWN_LOCATIONS: Dict[str, Dict[str, Any]] = {
     "kozhikode": {"name": "Kozhikode (Calicut)", "lat": 11.2588, "lon": 75.7804, "is_inland": False},
     "calicut": {"name": "Calicut", "lat": 11.2588, "lon": 75.7804, "is_inland": False},
     "കോഴിക്കോട്": {"name": "കോഴിക്കോട് (Calicut)", "lat": 11.2588, "lon": 75.7804, "is_inland": False},
+    "kollam": {"name": "Kollam", "lat": 8.8932, "lon": 76.6141, "is_inland": False},
+    "കൊല്ലം": {"name": "കൊല്ലം (Kollam)", "lat": 8.8932, "lon": 76.6141, "is_inland": False},
 
     # Andhra Pradesh & Telangana
     "visakhapatnam": {"name": "Visakhapatnam", "lat": 17.6868, "lon": 83.2185, "is_inland": False},
@@ -142,6 +181,8 @@ KNOWN_LOCATIONS: Dict[str, Dict[str, Any]] = {
     "विशाखापट्टनम": {"name": "विशाखापट्टनम (Vizag)", "lat": 17.6868, "lon": 83.2185, "is_inland": False},
     "kakinada": {"name": "Kakinada", "lat": 16.9891, "lon": 82.2475, "is_inland": False},
     "కాకినాడ": {"name": "కాకినాడ (Kakinada)", "lat": 16.9891, "lon": 82.2475, "is_inland": False},
+    "machilipatnam": {"name": "Machilipatnam", "lat": 16.1833, "lon": 81.1333, "is_inland": False},
+    "మచిలీపట్నం": {"name": "మచిలీపట్నం (Machilipatnam)", "lat": 16.1833, "lon": 81.1333, "is_inland": False},
     "hyderabad": {"name": "Hyderabad", "lat": 17.3850, "lon": 78.4867, "is_inland": True},
     "హైదరాబాద్": {"name": "హైదరాబాద్ (Hyderabad)", "lat": 17.3850, "lon": 78.4867, "is_inland": True},
     "हैदराबाद": {"name": "हैदराबाद (Hyderabad)", "lat": 17.3850, "lon": 78.4867, "is_inland": True},
@@ -300,20 +341,146 @@ class OrcaAgentOrchestrator:
         # 6. Fallback if no letters (e.g. only numbers or punctuation)
         return clean_fallback or "en"
 
+    def _is_inland_gps(self, lat: float, lon: float) -> bool:
+        """
+        Calculates whether a GPS coordinate is on land (inland) or in the sea/coastline.
+        """
+        # East Coast of India (Sea is to the East):
+        if 12.5 <= lat <= 13.6:
+            return lon < 80.255  # Chennai, Tambaram, Alandur, Kanchipuram
+        if 11.5 <= lat < 12.5:
+            return lon < 79.83   # Cuddalore, Pondicherry
+        if 10.5 <= lat < 11.5:
+            return lon < 79.84   # Nagapattinam, Karaikal
+        if 9.5 <= lat < 10.5:
+            return lon < 79.32   # Palk Bay
+        if 8.8 <= lat < 9.5:
+            return lon < 79.15   # Rameswaram / Ramanathapuram
+        if 8.0 <= lat < 8.8:
+            return lon < 77.55 if lat < 8.2 else lon < 78.14  # Kanyakumari / Tuticorin
+
+        # West Coast of India (Sea is to the West):
+        if 8.2 <= lat <= 10.5:
+            return lon > 76.30   # Kerala (Kochi, Kollam, Trivandrum)
+        if 10.5 < lat <= 13.5:
+            return lon > 74.80   # Mangalore / Malpe
+        if 13.5 < lat <= 16.0:
+            return lon > 73.80   # Goa / Karwar
+        if 16.0 < lat <= 20.0:
+            return lon > 72.85   # Mumbai / Maharashtra
+        if 20.0 < lat <= 24.0:
+            return lon > 70.40 if lat < 22.0 else lon > 70.10  # Gujarat
+
+        # Andhra, Odisha, West Bengal:
+        if 13.6 < lat <= 16.0:
+            return lon < 80.12   # Krishnapatnam
+        if 16.0 < lat <= 18.5:
+            return lon < 83.25   # Kakinada, Visakhapatnam
+        if 18.5 < lat <= 21.0:
+            return lon < 86.65   # Gopalpur, Paradip
+        if 21.0 < lat <= 24.0:
+            return lon < 87.50   # Digha, Haldia
+
+        return False
+
+    async def _reverse_geocode_location(self, lat: float, lon: float) -> Tuple[str, bool]:
+        """
+        Reverse geocodes GPS coordinates into human-readable place name and assesses inland vs coastal status.
+        Uses in-memory caching and real-time reverse geocoding API with port proximity fallback.
+        """
+        import time
+        cache_key = f"{round(lat, 3)}_{round(lon, 3)}"
+        now = time.time()
+        if cache_key in _GEOCODE_CACHE:
+            ts, name, inland = _GEOCODE_CACHE[cache_key]
+            if now - ts < 3600:
+                return name, inland
+
+        nearest_port = self._find_nearest_port(lat, lon)
+        port_dist = nearest_port["distance_km"] if nearest_port else 999.0
+        port_name = nearest_port["name"] if nearest_port else "Coastal Region"
+        port_state = nearest_port.get("state", "")
+
+        is_inland = self._is_inland_gps(lat, lon) or port_dist > 50.0
+        resolved_name = None
+
+        try:
+            async with httpx.AsyncClient(timeout=2.5) as client:
+                resp = await client.get(
+                    f"https://api.bigdatacloud.net/data/reverse-geocode-client?latitude={lat}&longitude={lon}&localityLanguage=en"
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    locality = data.get("locality") or data.get("city") or data.get("principalSubdivision")
+                    subdivision = data.get("principalSubdivision") or ""
+                    country = data.get("countryName") or ""
+
+                    parts = []
+                    if locality and locality != subdivision:
+                        parts.append(locality)
+                    if subdivision:
+                        parts.append(subdivision)
+                    elif country:
+                        parts.append(country)
+
+                    if parts:
+                        base_place = ", ".join(parts)
+                        if is_inland:
+                            resolved_name = f"{base_place} (Inland)"
+                        elif port_dist <= 15.0:
+                            resolved_name = f"{base_place} ({port_name} Sector)"
+                        elif port_dist <= 60.0:
+                            resolved_name = f"{base_place} Coast"
+                        else:
+                            resolved_name = base_place
+        except Exception as e:
+            logger.debug(f"Reverse geocode lookup: {e}")
+
+        if not resolved_name:
+            if is_inland:
+                resolved_name = "Inland Location"
+            elif port_dist <= 15.0:
+                resolved_name = f"{port_name} Coastal Sector"
+            elif port_dist <= 60.0:
+                resolved_name = f"{port_name} Waters"
+            else:
+                resolved_name = "Open Ocean"
+
+        _GEOCODE_CACHE[cache_key] = (now, resolved_name, is_inland)
+        return resolved_name, is_inland
+
     async def _resolve_target_location(self, query: str, default_lat: float, default_lon: float) -> Tuple[float, float, Optional[str], bool]:
         """
         Dynamically extracts and resolves target location from query (e.g. Madurai, Chennai, Rameshwaram, Kochi).
+        If relative phrases (here, my location, around me) or no specific city is named in the question,
+        resolves dynamically and precisely from the user's active device GPS coordinates!
         Returns (lat, lon, location_display_name, is_inland).
         """
         q_lower = query.lower()
-        
-        # 1. Match from KNOWN_LOCATIONS dictionary
-        for loc_key, loc_data in KNOWN_LOCATIONS.items():
-            if loc_key in q_lower:
-                logger.info(f"Target location detected in query: '{loc_key}' -> ({loc_data['lat']}, {loc_data['lon']})")
-                return loc_data["lat"], loc_data["lon"], loc_data["name"], loc_data.get("is_inland", False)
 
-        return default_lat, default_lon, None, False
+        # Check if user specifically refers to their current position
+        is_current_location_query = any(w in q_lower for w in [
+            "here", "my location", "current location", "near me", "around me", "my area", "this area",
+            "இங்கு", "என் இருப்பிடம்", "எனது இருப்பிடம்", "என்னைச் சுற்றி", "என் பகுதி",
+            "यहाँ", "मेरी जगह", "मेरे पास", "मेरे स्थान",
+            "ఇక్కడ", "నా స్థానం", "నా దగ్గర", "నా ప్రాంతం",
+            "ഇവിടെ", "എന്റെ സ്ഥലം", "എന്റെ ലൊക്കേഷൻ", "എനിക്ക് അടുത്ത്",
+            "येथे", "અહીં", "ଏଠାରେ", "ಇಲ್ಲಿ", "এখানে"
+        ])
+
+        if not is_current_location_query:
+            # Match from KNOWN_LOCATIONS dictionary only if explicitly requested in text
+            for loc_key, loc_data in KNOWN_LOCATIONS.items():
+                if loc_key in q_lower:
+                    logger.info(f"Target location detected in query: '{loc_key}' -> ({loc_data['lat']}, {loc_data['lon']})")
+                    return loc_data["lat"], loc_data["lon"], loc_data["name"], loc_data.get("is_inland", False)
+
+        # Dynamic GPS Location Resolution: Resolve from user's live device GPS coordinates
+        loc_name, is_inland = await self._reverse_geocode_location(default_lat, default_lon)
+        display_name = f"{loc_name} ({default_lat:.4f}°N, {default_lon:.4f}°E)"
+        logger.info(f"GPS Location auto-resolved: ({default_lat:.4f}, {default_lon:.4f}) -> {display_name}")
+        return default_lat, default_lon, display_name, is_inland
+
 
     def _resolve_target_date(self, query: str) -> Dict[str, Any]:
         """
@@ -1004,14 +1171,21 @@ class OrcaAgentOrchestrator:
             nearest_port_obj = self._find_nearest_port(resolved_lat, resolved_lon)
 
         if suggested_spot_summary is None and not is_inland:
+            spot_lat = round(resolved_lat + 0.05, 4)
+            spot_lon = round(resolved_lon + 0.06, 4)
+            d_km = round(self._haversine_km(resolved_lat, resolved_lon, spot_lat, spot_lon), 1)
+            d_nm = round(d_km / 1.852, 1)
+            b_deg = round(self._bearing_deg(resolved_lat, resolved_lon, spot_lat, spot_lon))
+            c_dir = self._degrees_to_cardinal(b_deg)
+            port_label = nearest_port_obj["name"] if nearest_port_obj else "Coastal"
             suggested_spot_summary = HotspotSummary(
-                name="Chennai Offshore Thermal Front",
-                latitude=13.1500,
-                longitude=80.4500,
-                distance_km=10.4,
-                distance_nm=5.6,
-                bearing_deg=45,
-                cardinal_direction="ENE",
+                name=f"{port_label} Thermal Front",
+                latitude=spot_lat,
+                longitude=spot_lon,
+                distance_km=d_km,
+                distance_nm=d_nm,
+                bearing_deg=b_deg,
+                cardinal_direction=c_dir,
                 target_species=["Indian Mackerel (கானாங்களுத்தி)", "Oil Sardine (மத்தி)", "Yellowfin Tuna (சூரை)"],
                 depth_meters=38
             )
@@ -1698,21 +1872,24 @@ class OrcaAgentOrchestrator:
         lang = self._normalize_lang_code(language) or "en"
         sp_text = ", ".join(spot.target_species) if spot else "Indian Mackerel, Sardine, Tuna"
         dataset_block = self._get_dataset_citation(lang, is_tomorrow, date_info)
-        loc_header = location_name or "Chennai Coast"
+        loc_header = location_name or f"GPS ({port_lat:.4f}°N, {port_lon:.4f}°E)"
 
         # 1. Attempt LLM Grounding with Gemini 2.0 Flash / Sarvam LLM
         target_forecast_date_label = date_info["period_display"]["en"] if (date_info and date_info.get("period_display")) else ("Tomorrow" if is_tomorrow else "Today")
         prompt_data = (
             f"User Question: {query}\n"
-            f"Target Location: {loc_header} (Is Inland: {is_inland})\n"
-            f"Target Language Code: {lang}\n"
-            f"Forecast Date: {target_forecast_date_label}\n"
-            f"Telemetry Ground Truth Data:\n"
+            f"User Current GPS Location: {loc_header} (Is Inland Region: {is_inland})\n"
+            f"Target Language: {lang}\n"
+            f"Forecast Period: {target_forecast_date_label}\n"
+            f"Nearest Base Port: {nearest_port} ({port_dist:.1f} km {port_cardinal}, Depth: {seafloor_depth}m, VHF: {port_vhf})\n"
+            f"Nearest INCOIS PFZ Hotspot: {spot.name if spot else 'Thermal Front'} ({spot.distance_km if spot else 10.4:.1f} km {spot.cardinal_direction if spot else 'ENE'}, Seafloor Depth: {spot.depth_meters if spot else 38}m, Target Species: {sp_text})\n"
+            f"Live Telemetry at this location:\n"
             f"- Temperature: {temp_c:.1f}°C (Range: {temp_min:.1f}°C - {temp_max:.1f}°C)\n"
-            f"- Rain Probability: {rain_prob}%, Expected Rainfall: {rain_sum:.1f} mm, Sky Condition: {weather_desc}\n"
+            f"- Rain Probability: {rain_prob}%, Rainfall Amount: {rain_sum:.1f} mm, Sky: {weather_desc}\n"
             f"- Wind Speed: {wind_kmh:.1f} km/h from {wind_dir} (Gusts: {wind_gusts:.1f} km/h)\n"
-            f"{f'- Significant Wave Height: {wave_height:.2f}m, Surface Current: {current_speed} kts towards {current_dir}' if not is_inland else '- Inland Terrain (No ocean waves)'}\n"
-            f"Answer the user directly and concisely in {lang} language with the real measurements provided above."
+            f"{f'- Significant Wave Height: {wave_height:.2f}m, Surface Ocean Current: {current_speed} kts towards {current_dir}, Sea Temp: {sea_temp:.1f}°C' if not is_inland else '- Inland Region (No maritime waves)'}\n"
+            f"- Risk Assessment: {risk.level} - {risk.title} ({risk.reason})\n\n"
+            f"Task: Provide a concise, highly relevant answer in {lang} language explicitly addressing the user's location ({loc_header}). Use real measurements and give practical safety and fishing advice."
         )
 
         try:
@@ -1869,7 +2046,7 @@ class OrcaAgentOrchestrator:
                     )
             return f"{resp}{dataset_block}", voice_text
 
-        elif intent == "rain_precipitation" or (is_inland and location_name):
+        elif intent in ["rain_precipitation", "weather_forecast"]:
 
             temp_str_en = f"{temp_min:.1f}°C - {temp_max:.1f}°C (Current: {temp_c:.1f}°C)" if (temp_max > temp_min and (temp_max - temp_min) > 0.5) else f"{temp_c:.1f}°C"
             temp_str_ta = f"{temp_min:.1f}°C முதல் {temp_max:.1f}°C வரை (தற்போது: {temp_c:.1f}°C)" if (temp_max > temp_min and (temp_max - temp_min) > 0.5) else f"{temp_c:.1f}°C"
@@ -2236,10 +2413,11 @@ class OrcaAgentOrchestrator:
 
         elif intent == "nearest_port":
             if lang == "ta":
-                voice_text = f"அருகிலுள்ள முதன்மை துறைமுகம் {nearest_port}."
+                voice_text = f"உங்கள் இருப்பிடத்திற்கு அருகிலுள்ள முதன்மை துறைமுகம் {nearest_port}."
                 resp = (
                     f"⚓ அருகிலுள்ள துறைமுகம் மற்றும் அவசர தளம்:\n"
-                    f"• முதன்மை துறைமுகம்: {nearest_port}\n"
+                    f"• முதன்மை துறைமுகம்: {nearest_port} ({port_lat:.4f}°N, {port_lon:.4f}°E)\n"
+                    f"• உங்கள் இருப்பிடம்: {loc_header}\n"
                     f"• தூரம்: {port_dist:.1f} கி.மீ ({port_dist_nm:.1f} கடல் மைல்) {port_cardinal}\n"
                     f"• துறைமுக ஆழம்: {seafloor_depth} மீட்டர் | VHF: {port_vhf}\n\n"
                     f"அவசர வழிகாட்டல்: அவசர காலங்களில் VHF சேனல் 16 மூலமாக கடலோர காவல்படையை தொடர்பு கொள்ளவும்."
@@ -2248,7 +2426,8 @@ class OrcaAgentOrchestrator:
                 voice_text = f"निकटतम बंदरगाह {nearest_port} है।"
                 resp = (
                     f"⚓ निकटतम बंदरगाह एवं आपातकालीन बेस:\n"
-                    f"• प्रमुख बंदरगाह: {nearest_port}\n"
+                    f"• प्रमुख बंदरगाह: {nearest_port} ({port_lat:.4f}°N, {port_lon:.4f}°E)\n"
+                    f"• आपका स्थान: {loc_header}\n"
                     f"• दूरी: {port_dist:.1f} किमी ({port_cardinal})\n"
                     f"• गहराई: {seafloor_depth} मीटर | VHF: {port_vhf}\n\n"
                     f"आपातकालीन सलाह: आपातकाल में VHF चैनल 16 पर संपर्क करें।"
@@ -2257,24 +2436,27 @@ class OrcaAgentOrchestrator:
                 voice_text = f"సమీప ఓడరేవు {nearest_port}."
                 resp = (
                     f"⚓ సమీప ఓడరేవు & అత్యవసర కేంద్రం:\n"
-                    f"• ఓడరేవు: {nearest_port}\n"
-                    f"• దూరం: {port_dist:.1f} కి.மீ ({port_cardinal})\n"
+                    f"• ఓడరేవు: {nearest_port} ({port_lat:.4f}°N, {port_lon:.4f}°E)\n"
+                    f"• మీ ప్రాంతం: {loc_header}\n"
+                    f"• దూరం: {port_dist:.1f} కి.మీ ({port_cardinal})\n"
                     f"• లోతు: {seafloor_depth} మీటర్లు | VHF: {port_vhf}\n"
                 )
             elif lang == "ml":
                 voice_text = f"ഏറ്റവും അടുത്തുള്ള തുറമുഖം {nearest_port}."
                 resp = (
                     f"⚓ ഏറ്റവും അടുത്തുള്ള തുറമുഖം:\n"
-                    f"• തുറമുഖം: {nearest_port}\n"
+                    f"• തുറമുഖം: {nearest_port} ({port_lat:.4f}°N, {port_lon:.4f}°E)\n"
+                    f"• നിങ്ങളുടെ സ്ഥലം: {loc_header}\n"
                     f"• ദൂരം: {port_dist:.1f} കി.മീ ({port_cardinal})\n"
                     f"• ആഴം: {seafloor_depth} മീറ്റർ | VHF: {port_vhf}\n"
                 )
             else:
-                voice_text = f"Nearest base port is {nearest_port} at {port_dist:.1f} kilometers."
+                voice_text = f"Nearest base port is {nearest_port} at {port_dist:.1f} kilometers {port_cardinal}."
                 resp = (
                     f"⚓ Nearest Base Port & Emergency Maritime Harbor:\n"
-                    f"• Base Port: {nearest_port}\n"
-                    f"• Distance Vector: {port_dist:.1f} km ({port_dist_nm:.1f} NM) {port_cardinal}\n"
+                    f"• Base Port: {nearest_port} ({port_lat:.4f}°N, {port_lon:.4f}°E)\n"
+                    f"• User Location: {loc_header}\n"
+                    f"• Distance Vector: {port_dist:.1f} km ({port_dist_nm:.1f} NM) {port_cardinal} (Bearing: {port_bearing:.0f}°)\n"
                     f"• Harbor Depth: {seafloor_depth} meters | Coast Guard VHF: {port_vhf}\n\n"
                     f"Emergency Directive: Establish contact on VHF Marine Channel 16 (156.8 MHz) during emergencies."
                 )

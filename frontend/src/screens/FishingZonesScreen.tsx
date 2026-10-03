@@ -1299,7 +1299,7 @@ const styles = StyleSheet.create({
   },
   modalSub: {
     fontSize: 12,
-    color: '#B0ECE8',
+    color: '#a7e8e2',
     fontWeight: '600',
     marginTop: 2,
   },

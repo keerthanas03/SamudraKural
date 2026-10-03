@@ -111,7 +111,7 @@ export const CGDashboardScreen: React.FC<CGDashboardScreenProps> = ({
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.cgPrimaryDark} />
 
       {/* Top Header Banner */}
@@ -173,11 +173,6 @@ export const CGDashboardScreen: React.FC<CGDashboardScreenProps> = ({
             <View style={styles.compassHeaderGroup}>
               <Text style={styles.compassIcon}>📡</Text>
               <Text style={styles.heroGpsTitle}>COASTAL COMMAND RADAR</Text>
-            </View>
-
-            <View style={styles.heroGpsBadge}>
-              <View style={styles.heroGpsDot} />
-              <Text style={styles.heroGpsBadgeText}>RADAR ACTIVE 🟢</Text>
             </View>
           </View>
 
@@ -310,7 +305,7 @@ export const CGDashboardScreen: React.FC<CGDashboardScreenProps> = ({
           />
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -388,7 +383,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   scrollContent: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
     paddingBottom: 100,
   },
   /* Emergency Notification Card Styles */

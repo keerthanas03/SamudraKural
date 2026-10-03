@@ -20,6 +20,7 @@ import {
   getNavigationDetails,
   CalculatedNavigationData,
   calculateSafeMaritimeRoute,
+  isLocationInland,
 } from '../services/navigationService';
 import {
   fetchSectorAdvisory,
@@ -264,12 +265,12 @@ export const NavigationScreen: React.FC<NavigationScreenProps> = ({
       loadTelemetryData(true);
     }, 4000);
     return () => clearInterval(timer);
-  }, [boatLocation.lat, boatLocation.lon]);
+  }, [boatLocation.lat, boatLocation.lon, gpsPlaceName]);
 
   const loadTelemetryData = async (isSilent: boolean = false) => {
     if (!isSilent && !telemetry) setTelemetryLoading(true);
     try {
-      const data = await fetchLiveMarineTelemetry(boatLocation.lat, boatLocation.lon);
+      const data = await fetchLiveMarineTelemetry(boatLocation.lat, boatLocation.lon, gpsPlaceName);
       setTelemetry(data);
     } catch (err) {
       console.error('Error fetching live marine telemetry:', err);
@@ -453,9 +454,17 @@ export const NavigationScreen: React.FC<NavigationScreenProps> = ({
                 <Text style={styles.telemetryIcon}>🌊</Text>
               </View>
             </View>
-            <Text style={styles.telemetryValue}>{telemetry?.waveHeight || '0.8m - 1.4m'}</Text>
-            <Text style={styles.telemetryLabel}>Wave Height</Text>
-            <Text style={styles.telemetrySub}>Sea State: {telemetry?.seaState || 'Slight to Moderate'}</Text>
+            <Text style={styles.telemetryValue}>
+              {telemetry?.isInland || isLocationInland(boatLocation.lat, boatLocation.lon, gpsPlaceName)
+                ? '0.0 m'
+                : (telemetry?.waveHeight || '0.0 m')}
+            </Text>
+            <Text style={styles.telemetryLabel}>{t('waveHeight') || 'Wave Height'}</Text>
+            <Text style={styles.telemetrySub}>
+              {telemetry?.isInland || isLocationInland(boatLocation.lat, boatLocation.lon, gpsPlaceName)
+                ? 'Inland / Land (0.0 m)'
+                : (telemetry?.seaState ? `Sea State: ${telemetry.seaState}` : 'Sea State: Calm')}
+            </Text>
           </View>
 
           {/* Card 2: Wind Speed */}

@@ -119,9 +119,15 @@ export interface RiskZoneItem {
 const SHARED_ALERTS_KEY = '@samudra_kural_shared_sos_alerts';
 const SHARED_MISSIONS_KEY = '@samudra_kural_shared_rescue_missions';
 
+let inMemoryAlertsCache: SOSAlertItem[] | null = null;
+let inMemoryMissionsCache: RescueMissionItem[] | null = null;
+
 export const coastalGuardService = {
   // Helper to read persistent local rescue missions
   async getLocalMissions(): Promise<RescueMissionItem[]> {
+    if (inMemoryMissionsCache !== null) {
+      return [...inMemoryMissionsCache];
+    }
     const defaultMissions: RescueMissionItem[] = [];
 
     try {
@@ -129,8 +135,8 @@ export const coastalGuardService = {
       if (json) {
         const storedMissions: RescueMissionItem[] = JSON.parse(json);
         if (Array.isArray(storedMissions)) {
-          // Filter out legacy mock missions
           const cleaned = storedMissions.filter(m => ![101, 102, 103, 104].includes(m.id) && !m.officer_name?.includes('Rajesh Kumar'));
+          inMemoryMissionsCache = cleaned;
           return cleaned;
         }
       }
@@ -138,6 +144,7 @@ export const coastalGuardService = {
       console.error('[CG Service] Error reading local missions:', e);
     }
 
+    inMemoryMissionsCache = defaultMissions;
     return defaultMissions;
   },
 
@@ -150,6 +157,7 @@ export const coastalGuardService = {
       } else {
         list.unshift(mission);
       }
+      inMemoryMissionsCache = list;
       await AsyncStorage.setItem(SHARED_MISSIONS_KEY, JSON.stringify(list));
     } catch (e) {
       console.error('[CG Service] Error saving local mission:', e);
@@ -232,6 +240,9 @@ export const coastalGuardService = {
 
   // Helper to read persistent local alerts
   async getLocalAlerts(): Promise<SOSAlertItem[]> {
+    if (inMemoryAlertsCache !== null) {
+      return [...inMemoryAlertsCache];
+    }
     const defaultAlerts: SOSAlertItem[] = [];
 
     try {
@@ -239,8 +250,9 @@ export const coastalGuardService = {
       if (json) {
         const storedAlerts: SOSAlertItem[] = JSON.parse(json);
         if (Array.isArray(storedAlerts)) {
-          // Filter out legacy mock alerts (Karthik Raja, Murugan Swamy, R. Selvam, S. Anthony)
+          // Filter out legacy mock alerts
           const cleaned = storedAlerts.filter(a => ![1, 2, 3, 4].includes(a.id) && !['Karthik Raja', 'Murugan Swamy', 'R. Selvam', 'S. Anthony'].includes(a.fisherman?.name || ''));
+          inMemoryAlertsCache = cleaned;
           return cleaned;
         }
       }
@@ -248,6 +260,7 @@ export const coastalGuardService = {
       console.error('[CG Service] Error reading local alerts:', e);
     }
 
+    inMemoryAlertsCache = defaultAlerts;
     return defaultAlerts;
   },
 
@@ -260,6 +273,7 @@ export const coastalGuardService = {
       } else {
         list.unshift(alert);
       }
+      inMemoryAlertsCache = list;
       await AsyncStorage.setItem(SHARED_ALERTS_KEY, JSON.stringify(list));
     } catch (e) {
       console.error('[CG Service] Error saving local alert:', e);
@@ -290,6 +304,7 @@ export const coastalGuardService = {
       };
       list.unshift(target);
     }
+    inMemoryAlertsCache = list;
     try {
       await AsyncStorage.setItem(SHARED_ALERTS_KEY, JSON.stringify(list));
     } catch (e) {}
@@ -300,9 +315,8 @@ export const coastalGuardService = {
   // Fetch Command Center Dashboard Metrics
   async getDashboard(): Promise<CoastalGuardDashboardData> {
     try {
-      return await apiFetch<CoastalGuardDashboardData>('/coastal-guard/dashboard');
+      return await apiFetch<CoastalGuardDashboardData>('/coastal-guard/dashboard', { timeoutMs: 800 });
     } catch (e) {
-      console.log('[CG Service] Using local dashboard sync');
       const alerts = await this.getLocalAlerts();
       const missions = await this.getLocalMissions();
       const activeSos = alerts.filter(a => a.status !== 'RESOLVED' && a.status !== 'CANCELLED');
@@ -322,7 +336,7 @@ export const coastalGuardService = {
     }
   },
 
-  // Fetch SOS Alerts List
+  // Fetch SOS Alerts List with sub-second performance
   async getSOSAlerts(statusFilter?: string, priorityFilter?: string, search?: string): Promise<SOSAlertItem[]> {
     let alerts: SOSAlertItem[] = [];
     try {
@@ -333,9 +347,11 @@ export const coastalGuardService = {
       if (priorityFilter) queryParams.push(`priority=${encodeURIComponent(priorityFilter)}`);
       if (search) queryParams.push(`search=${encodeURIComponent(search)}`);
       const queryStr = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
-      alerts = await apiFetch<SOSAlertItem[]>(`/coastal-guard/sos${queryStr}`, { timeoutMs: 5000 });
+      alerts = await apiFetch<SOSAlertItem[]>(`/coastal-guard/sos${queryStr}`, { timeoutMs: 600 });
+      if (Array.isArray(alerts)) {
+        inMemoryAlertsCache = alerts;
+      }
     } catch (e) {
-      console.log('[CG Service] Using local persistent SOS list');
       alerts = await this.getLocalAlerts();
     }
 
@@ -489,7 +505,7 @@ export const coastalGuardService = {
     return alertItem;
   },
 
-  // Fetch Rescue Missions
+  // Fetch Rescue Missions with sub-second response
   async getMissions(statusFilter?: string | number, sos_alert_id?: number): Promise<RescueMissionItem[]> {
     let missions: RescueMissionItem[] = [];
     try {
@@ -498,9 +514,11 @@ export const coastalGuardService = {
         : sos_alert_id
         ? `?sos_alert_id=${sos_alert_id}`
         : '';
-      missions = await apiFetch<RescueMissionItem[]>(`/coastal-guard/missions${queryStr}`);
+      missions = await apiFetch<RescueMissionItem[]>(`/coastal-guard/missions${queryStr}`, { timeoutMs: 600 });
+      if (Array.isArray(missions)) {
+        inMemoryMissionsCache = missions;
+      }
     } catch (e) {
-      console.log('[CG Service] Using local persistent missions list');
       missions = await this.getLocalMissions();
     }
 

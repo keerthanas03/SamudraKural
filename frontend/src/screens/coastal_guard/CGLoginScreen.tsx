@@ -241,6 +241,8 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     marginTop: 10,
+    backgroundColor: '#1D4E89', // Coastal Guard Command Blue
+    borderColor: '#1D4E89',
   },
   registerLink: {
     alignItems: 'center',
